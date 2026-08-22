@@ -1,71 +1,132 @@
-<!DOCTYPE html>
+  <!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>特典会チェキアプリ</title>
+  <title>特典会チェキアプリ（ポップアップUI版）</title>
   <style>
-    body { text-align: center; background: #111; color: white; font-family: sans-serif; margin: 0; padding: 10px; touch-action: manipulation; }
-    .screen { display: none; }
-    .screen.active { display: block; }
+    body { text-align: center; background: #111; color: white; font-family: sans-serif; margin: 0; padding: 5px; touch-action: manipulation; overflow: hidden; }
+    .screen { display: none; height: 100vh; box-sizing: border-box; }
+    .screen.active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
     
-    canvas, img { max-width: 90vw; max-height: 52vh; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.6); background: white; object-fit: contain; }
-    
-    /* チェキ風ファインダー */
+    /* チェキ風ファインダー 3:4 比率 */
     .viewfinder-container {
       position: relative;
       display: inline-block;
       background: white;
-      padding: 15px 15px 50px 15px;
+      padding: 12px 12px 45px 12px;
       box-shadow: 0 4px 15px rgba(0,0,0,0.6);
       border-radius: 6px;
-      margin-top: 10px;
     }
     video {
-      width: 100%;
-      max-width: 380px;
+      width: 270px;
       aspect-ratio: 3 / 4;
       object-fit: cover;
       background: #000;
       display: block;
     }
 
-    button { padding: 12px 20px; font-size: 15px; margin: 5px; cursor: pointer; border: none; border-radius: 25px; font-weight: bold; }
+    /* プレビュー用画像・描画用キャンバス (3:4) */
+    #previewImg, #chekiCanvas {
+      width: 290px;
+      aspect-ratio: 3 / 4;
+      max-height: 75vh;
+      border-radius: 6px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+      background: white;
+      object-fit: contain;
+    }
+
+    button { padding: 10px 18px; font-size: 14px; margin: 4px; cursor: pointer; border: none; border-radius: 20px; font-weight: bold; }
     .btn-main { background: #ff4081; color: white; }
     .btn-sub { background: #777; color: white; }
-    .btn-clear { background: #d9534f; color: white; }
-    .btn-action-row { margin-top: 10px; }
+    .btn-action-row { margin-top: 8px; }
 
-    /* 描画ツール用コントロールパネル */
-    .tool-panel {
+    /* 描画画面コンテナ */
+    #screen-draw { position: relative; }
+
+    /* 左上の縦並びツールバー */
+    .left-toolbar {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 10;
+    }
+    .tool-icon-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(34, 34, 34, 0.85);
+      border: 2px solid white;
+      color: white;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      padding: 0;
+      margin: 0;
+    }
+
+    /* 画面中央ポップアップモーダル */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0, 0, 0, 0.6);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-content {
       background: #222;
-      padding: 8px;
-      border-radius: 10px;
-      margin-top: 8px;
-      display: inline-block;
-      max-width: 95vw;
+      border: 2px solid #555;
+      padding: 20px;
+      border-radius: 15px;
+      width: 80%;
+      max-width: 300px;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.8);
+      text-align: center;
     }
-    
-    /* カラーボタン（色名表示） */
-    .color-btn {
-      width: 36px; height: 36px; border-radius: 50%; border: 2px solid white;
-      display: inline-flex; align-items: center; justify-content: center;
-      margin: 0 3px; cursor: pointer; vertical-align: middle;
-      font-size: 11px; font-weight: bold;
+    .modal-title { font-size: 16px; margin-bottom: 15px; font-weight: bold; color: #ff4081; }
+
+    /* ポップアップ内のカラー・太さグリッド */
+    .color-grid, .size-grid, .stamp-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      justify-items: center;
     }
-    .color-btn.active { border: 3px solid #ff4081; transform: scale(1.1); }
-    
-    .size-btn { padding: 5px 10px; font-size: 12px; border-radius: 15px; background: #444; color: white; border: 1px solid #666; margin: 0 2px; }
-    .size-btn.active { background: #ff4081; border-color: #ff4081; }
-    
-    /* スタンプボタン */
-    .stamp-btn { font-size: 20px; padding: 4px 10px; background: #333; border-radius: 8px; border: 1px solid #555; margin: 0 3px; cursor: pointer; }
-    .stamp-btn.active { background: #ff4081; border-color: white; }
+    .pop-color-btn {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: 2px solid white;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .pop-btn {
+      width: 100%;
+      padding: 12px;
+      background: #444;
+      color: white;
+      border: 1px solid #666;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .pop-btn.active { background: #ff4081; border-color: white; }
   </style>
 </head>
 <body>
 
-  <!-- ================= 画面1: 即カメラモード ================= -->
+  <!-- ================= 画面1: カメラ撮影 ================= -->
   <div id="screen-capture" class="screen active">
     <div class="viewfinder-container">
       <video id="cameraStream" autoplay playsinline muted></video>
@@ -76,7 +137,7 @@
     <canvas id="hiddenCanvas" style="display:none;"></canvas>
   </div>
 
-  <!-- ================= 画面2: プレビュー確認画面 ================= -->
+  <!-- ================= 画面2: プレビュー確認 ================= -->
   <div id="screen-preview" class="screen">
     <h3>👀 プレビュー確認</h3>
     <div>
@@ -90,44 +151,64 @@
 
   <!-- ================= 画面3: 描画（デコ）画面 ================= -->
   <div id="screen-draw" class="screen">
-    <canvas id="chekiCanvas"></canvas>
     
-    <!-- ツールパネル -->
-    <div class="tool-panel">
-      <!-- ペンカラー（黒・赤・青・黄・紫・緑・白） -->
-      <div>
-        <span class="color-btn active" style="background:#000000; color:#fff;" onclick="setPenColor('#000000', this)">黒</span>
-        <span class="color-btn" style="background:#ff3b30; color:#fff;" onclick="setPenColor('#ff3b30', this)">赤</span>
-        <span class="color-btn" style="background:#007aff; color:#fff;" onclick="setPenColor('#007aff', this)">青</span>
-        <span class="color-btn" style="background:#ffcc00; color:#000;" onclick="setPenColor('#ffcc00', this)">黄</span>
-        <span class="color-btn" style="background:#ff00ff; color:#fff;" onclick="setPenColor('#ff00ff', this)">紫</span>
-        <span class="color-btn" style="background:#34c759; color:#fff;" onclick="setPenColor('#34c759', this)">緑</span>
-        <span class="color-btn" style="background:#ffffff; color:#000;" onclick="setPenColor('#ffffff', this)">白</span>
-      </div>
-
-      <!-- ペン太さ & 戻す & クリア -->
-      <div style="margin-top: 6px;">
-        <button class="size-btn" onclick="setPenSize(3, this)">細</button>
-        <button class="size-btn active" onclick="setPenSize(7, this)">中</button>
-        <button class="size-btn" onclick="setPenSize(14, this)">太</button>
-        <button class="size-btn" style="background:#555;" onclick="undoCanvas()">↩️戻す</button>
-        <button class="size-btn btn-clear" style="background:#b52b27; border:none;" onclick="clearCanvas()">🗑️クリア</button>
-      </div>
-
-      <!-- スタンプ選択（タップして配置モード切り替え） -->
-      <div style="margin-top: 6px;">
-        <span style="font-size:11px; color:#aaa; margin-right:3px;">スタンプ:</span>
-        <button class="stamp-btn" onclick="selectStamp('⭐', this)">⭐</button>
-        <button class="stamp-btn" onclick="selectStamp('✨', this)">✨</button>
-        <button class="stamp-btn" onclick="selectStamp('💖', this)">💖</button>
-        <button class="stamp-btn" onclick="selectStamp('推し', this)">推し</button>
-        <button class="size-btn" style="background:#333; margin-left:5px;" onclick="cancelStamp()">ペンに戻る</button>
-      </div>
+    <!-- 左上の縦並びツールバー -->
+    <div class="left-toolbar">
+      <button class="tool-icon-btn" onclick="openModal('modal-color')" title="色">🎨</button>
+      <button class="tool-icon-btn" onclick="openModal('modal-size')" title="太さ">✒️</button>
+      <button class="tool-icon-btn" onclick="openModal('modal-stamp')" title="スタンプ">⭐</button>
+      <button class="tool-icon-btn" onclick="undoCanvas()" title="戻す">↩️</button>
+      <button class="tool-icon-btn" onclick="clearCanvas()" title="クリア" style="background:#b52b27;">🗑️</button>
     </div>
 
-    <div class="btn-action-row">
-      <button class="btn-sub" onclick="retakePhoto()">🔄 最初から</button>
-      <button class="btn-main" onclick="saveCheki()">💾 保存する</button>
+    <canvas id="chekiCanvas"></canvas>
+
+    <div class="btn-action-row" style="margin-top: 5px;">
+      <button class="btn-sub" onclick="retakePhoto()" style="padding: 8px 15px; font-size: 13px;">🔄 最初から</button>
+      <button class="btn-main" onclick="saveCheki()" style="padding: 8px 15px; font-size: 13px;">💾 保存する</button>
+    </div>
+  </div>
+
+  <!-- ================= 各種ポップアップモーダル ================= -->
+  <!-- 色選択モーダル -->
+  <div id="modal-color" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-color')">
+    <div class="modal-content">
+      <div class="modal-title">ペンの色を選択</div>
+      <div class="color-grid">
+        <button class="pop-color-btn" style="background:#000000; color:#fff;" onclick="setPenColor('#000000')">黒</button>
+        <button class="pop-color-btn" style="background:#ff3b30; color:#fff;" onclick="setPenColor('#ff3b30')">赤</button>
+        <button class="pop-color-btn" style="background:#007aff; color:#fff;" onclick="setPenColor('#007aff')">青</button>
+        <button class="pop-color-btn" style="background:#ffcc00; color:#000;" onclick="setPenColor('#ffcc00')">黄</button>
+        <button class="pop-color-btn" style="background:#ff00ff; color:#fff;" onclick="setPenColor('#ff00ff')">紫</button>
+        <button class="pop-color-btn" style="background:#34c759; color:#fff;" onclick="setPenColor('#34c759')">緑</button>
+        <button class="pop-color-btn" style="background:#ffffff; color:#000; grid-column: span 2;" onclick="setPenColor('#ffffff')">白</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 太さ選択モーダル -->
+  <div id="modal-size" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-size')">
+    <div class="modal-content">
+      <div class="modal-title">ペンの太さを選択</div>
+      <div class="size-grid" style="grid-template-columns: 1fr;">
+        <button class="pop-btn" onclick="setPenSize(4)">細</button>
+        <button class="pop-btn" onclick="setPenSize(10)">中</button>
+        <button class="pop-btn" onclick="setPenSize(20)">太</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- スタンプ選択モーダル -->
+  <div id="modal-stamp" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-stamp')">
+    <div class="modal-content">
+      <div class="modal-title">スタンプを選択</div>
+      <div class="stamp-grid">
+        <button class="pop-btn" style="font-size:24px;" onclick="selectStamp('⭐')">⭐</button>
+        <button class="pop-btn" style="font-size:24px;" onclick="selectStamp('✨')">✨</button>
+        <button class="pop-btn" style="font-size:24px;" onclick="selectStamp('💖')">💖</button>
+        <button class="pop-btn" style="font-size:20px;" onclick="selectStamp('推し')">推し</button>
+      </div>
+      <button class="pop-btn" style="margin-top:15px; background:#444;" onclick="cancelStamp()">ペンモードに戻る</button>
     </div>
   </div>
 
@@ -140,10 +221,10 @@
     const ctx = canvas.getContext('2d');
     let isDrawing = false;
     let penColor = '#000000';
-    let penSize = 7;
-    let selectedStamp = null; // 選択中のスタンプ
+    let penSize = 10;
+    let selectedStamp = null;
     let history = [];
-    let baseImage = null; // クリア用・ベース画像
+    let baseImage = null;
 
     function switchScreen(screenId) {
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -154,7 +235,7 @@
       switchScreen('screen-capture');
       try {
         mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+          video: { facingMode: 'environment', width: { ideal: 1080 }, height: { ideal: 1440 } },
           audio: false
         });
         video.srcObject = mediaStream;
@@ -166,7 +247,7 @@
     async function retryCameraOnce() {
       try {
         mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+          video: { facingMode: 'environment', width: { ideal: 1080 }, height: { ideal: 1440 } },
           audio: false
         });
         video.srcObject = mediaStream;
@@ -175,19 +256,21 @@
       }
     }
 
+    // --- 正確な 3:4 チェキ風レイアウトで撮影 ---
     function takeSnapshot() {
       const hiddenCanvas = document.getElementById('hiddenCanvas');
       const hCtx = hiddenCanvas.getContext('2d');
 
       const targetW = 600;
-      const targetH = 850;
+      const targetH = 800; // 3:4比率 (600:800)
       hiddenCanvas.width = targetW;
       hiddenCanvas.height = targetH;
 
       hCtx.fillStyle = '#ffffff';
       hCtx.fillRect(0, 0, targetW, targetH);
 
-      const pX = 40, pY = 40, pW = 520, pH = 693;
+      // 3:4チェキ風余白（左右上下に綺麗に収める）
+      const pX = 35, pY = 35, pW = 530, pH = 707; // ほぼ3:4
       const vW = video.videoWidth, vH = video.videoHeight;
       const vAspect = vW / vH, targetAspect = pW / pH;
 
@@ -195,7 +278,7 @@
       if (vAspect > targetAspect) {
         sH = vH; sW = vH * targetAspect; sx = (vW - sW) / 2; sy = 0;
       } else {
-        sW = vW; sH = vH / targetAspect; sx = 0; sy = (vH - sH) / 2;
+        sW = vW; sH = vW / targetAspect; sx = 0; sy = (vH - sH) / 2;
       }
 
       hCtx.drawImage(video, sx, sy, sW, sH, pX, pY, pW, pH);
@@ -209,7 +292,7 @@
           mediaStream.getTracks().forEach(track => track.stop());
         }
         switchScreen('screen-preview');
-      }, 'image/jpeg', 0.85);
+      }, 'image/jpeg', 0.9);
     }
 
     function retakePhoto() {
@@ -217,11 +300,9 @@
       startCamera();
     }
 
-    // --- プレビュー確認：「これでOK」で即保存 ＆ 描画画面へ ---
     function confirmPhoto() {
       if (!capturedBlob) return;
 
-      // 自動保存処理
       const downloadLink = document.createElement('a');
       const url = URL.createObjectURL(capturedBlob);
       downloadLink.href = url;
@@ -231,10 +312,10 @@
       document.body.removeChild(downloadLink);
 
       canvas.width = 600;
-      canvas.height = 850;
+      canvas.height = 800; // 3:4
 
       const img = new Image();
-      baseImage = img; // クリア用に保持
+      baseImage = img;
       img.onload = function() {
         ctx.drawImage(img, 0, 0);
         history = [];
@@ -245,7 +326,41 @@
       img.src = url;
     }
 
-    // --- 描画＆スタンプ操作イベント ---
+    // --- ポップアップモーダル制御 ---
+    function openModal(modalId) {
+      document.getElementById(modalId).classList.add('active');
+    }
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.remove('active');
+    }
+    function closeModalOnBg(e, modalId) {
+      if (e.target.id === modalId) {
+        closeModal(modalId);
+      }
+    }
+
+    function setPenColor(color) {
+      penColor = color;
+      selectedStamp = null;
+      closeModal('modal-color');
+    }
+
+    function setPenSize(size) {
+      penSize = size;
+      closeModal('modal-size');
+    }
+
+    function selectStamp(stampText) {
+      selectedStamp = stampText;
+      closeModal('modal-stamp');
+    }
+
+    function cancelStamp() {
+      selectedStamp = null;
+      closeModal('modal-stamp');
+    }
+
+    // --- 描画イベント ---
     function initDrawingEvents() {
       canvas.onmousedown = handleCanvasDown;
       canvas.onmousemove = handleCanvasMove;
@@ -271,9 +386,8 @@
       const pos = getMousePos(e);
 
       if (selectedStamp) {
-        // スタンプ配置モードのとき：タップした場所にスタンプを置く
         ctx.save();
-        ctx.font = 'bold 50px sans-serif';
+        ctx.font = 'bold 60px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.shadowColor = 'white';
@@ -282,7 +396,6 @@
         ctx.restore();
         saveHistory();
       } else {
-        // 通常のペン描きモード
         isDrawing = true;
         ctx.beginPath();
         ctx.moveTo(pos.x, pos.y);
@@ -307,7 +420,6 @@
       }
     }
 
-    // --- 履歴・クリア管理 ---
     function saveHistory() {
       if (history.length > 15) history.shift();
       history.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
@@ -322,39 +434,15 @@
     }
 
     function clearCanvas() {
-      if (baseImage) {
-        ctx.drawImage(baseImage, 0, 0);
-        history = [];
-        saveHistory();
+      if (confirm('描画をすべてクリアしますか？')) {
+        if (baseImage) {
+          ctx.drawImage(baseImage, 0, 0);
+          history = [];
+          saveHistory();
+        }
       }
     }
 
-    // --- ツール選択 ---
-    function setPenColor(color, element) {
-      penColor = color;
-      cancelStamp(); // スタンプモード解除
-      document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
-      element.classList.add('active');
-    }
-
-    function setPenSize(size, element) {
-      penSize = size;
-      document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
-      if(element) element.classList.add('active');
-    }
-
-    function selectStamp(stampText, element) {
-      selectedStamp = stampText;
-      document.querySelectorAll('.stamp-btn').forEach(b => b.classList.remove('active'));
-      element.classList.add('active');
-    }
-
-    function cancelStamp() {
-      selectedStamp = null;
-      document.querySelectorAll('.stamp-btn').forEach(b => b.classList.remove('active'));
-    }
-
-    // --- 最終保存処理 ---
     function saveCheki() {
       canvas.toBlob(function(blob) {
         const link = document.createElement('a');
