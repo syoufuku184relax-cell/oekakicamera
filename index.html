@@ -1,12 +1,12 @@
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>特典会チェキアプリ（ポップアップUI版）</title>
+  <title>特典会チェキアプリ（全画面・ピンク追加版）</title>
   <style>
-    body { text-align: center; background: #111; color: white; font-family: sans-serif; margin: 0; padding: 5px; touch-action: manipulation; overflow: hidden; }
-    .screen { display: none; height: 100vh; box-sizing: border-box; }
+    body { text-align: center; background: #111; color: white; font-family: sans-serif; margin: 0; padding: 0; touch-action: manipulation; overflow: hidden; }
+    .screen { display: none; height: 100vh; box-sizing: border-box; padding: 5px 0; }
     .screen.active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
     
     /* チェキ風ファインダー 3:4 比率 */
@@ -14,33 +14,36 @@
       position: relative;
       display: inline-block;
       background: white;
-      padding: 12px 12px 45px 12px;
+      padding: 10px 10px 40px 10px;
       box-shadow: 0 4px 15px rgba(0,0,0,0.6);
       border-radius: 6px;
     }
     video {
-      width: 270px;
+      width: 80vw;
+      max-width: 340px;
       aspect-ratio: 3 / 4;
       object-fit: cover;
       background: #000;
       display: block;
     }
 
-    /* プレビュー用画像・描画用キャンバス (3:4) */
+    /* スマホ全画面に近いサイズまで限界まで大きく表示 (3:4保持) */
     #previewImg, #chekiCanvas {
-      width: 290px;
+      width: auto;
+      height: auto;
+      max-width: 92vw;
+      max-height: 85vh;
       aspect-ratio: 3 / 4;
-      max-height: 75vh;
       border-radius: 6px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.8);
       background: white;
       object-fit: contain;
     }
 
-    button { padding: 10px 18px; font-size: 14px; margin: 4px; cursor: pointer; border: none; border-radius: 20px; font-weight: bold; }
+    button { padding: 8px 16px; font-size: 13px; margin: 3px; cursor: pointer; border: none; border-radius: 20px; font-weight: bold; }
     .btn-main { background: #ff4081; color: white; }
     .btn-sub { background: #777; color: white; }
-    .btn-action-row { margin-top: 8px; }
+    .btn-action-row { margin-top: 5px; }
 
     /* 描画画面コンテナ */
     #screen-draw { position: relative; }
@@ -48,21 +51,21 @@
     /* 左上の縦並びツールバー */
     .left-toolbar {
       position: absolute;
-      top: 15px;
-      left: 15px;
+      top: 10px;
+      left: 10px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
       z-index: 10;
     }
     .tool-icon-btn {
-      width: 44px;
-      height: 44px;
+      width: 42px;
+      height: 42px;
       border-radius: 50%;
       background: rgba(34, 34, 34, 0.85);
       border: 2px solid white;
       color: white;
-      font-size: 18px;
+      font-size: 17px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -86,20 +89,20 @@
     .modal-content {
       background: #222;
       border: 2px solid #555;
-      padding: 20px;
+      padding: 15px;
       border-radius: 15px;
       width: 80%;
-      max-width: 300px;
+      max-width: 280px;
       box-shadow: 0 5px 20px rgba(0,0,0,0.8);
       text-align: center;
     }
-    .modal-title { font-size: 16px; margin-bottom: 15px; font-weight: bold; color: #ff4081; }
+    .modal-title { font-size: 15px; margin-bottom: 12px; font-weight: bold; color: #ff4081; }
 
     /* ポップアップ内のカラー・太さグリッド */
     .color-grid, .size-grid, .stamp-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 10px;
+      gap: 8px;
       justify-items: center;
     }
     .pop-color-btn {
@@ -113,7 +116,7 @@
     }
     .pop-btn {
       width: 100%;
-      padding: 12px;
+      padding: 10px;
       background: #444;
       color: white;
       border: 1px solid #666;
@@ -121,7 +124,6 @@
       font-size: 14px;
       cursor: pointer;
     }
-    .pop-btn.active { background: #ff4081; border-color: white; }
   </style>
 </head>
 <body>
@@ -139,7 +141,7 @@
 
   <!-- ================= 画面2: プレビュー確認 ================= -->
   <div id="screen-preview" class="screen">
-    <h3>👀 プレビュー確認</h3>
+    <div style="font-size: 14px; font-weight: bold; margin-bottom: 2px;">👀 プレビュー確認</div>
     <div>
       <img id="previewImg" alt="プレビュー">
     </div>
@@ -163,14 +165,14 @@
 
     <canvas id="chekiCanvas"></canvas>
 
-    <div class="btn-action-row" style="margin-top: 5px;">
-      <button class="btn-sub" onclick="retakePhoto()" style="padding: 8px 15px; font-size: 13px;">🔄 最初から</button>
-      <button class="btn-main" onclick="saveCheki()" style="padding: 8px 15px; font-size: 13px;">💾 保存する</button>
+    <div class="btn-action-row">
+      <button class="btn-sub" onclick="retakePhoto()" style="padding: 6px 12px; font-size: 12px;">🔄 最初から</button>
+      <button class="btn-main" onclick="saveCheki()" style="padding: 6px 12px; font-size: 12px;">💾 保存する</button>
     </div>
   </div>
 
   <!-- ================= 各種ポップアップモーダル ================= -->
-  <!-- 色選択モーダル -->
+  <!-- 色選択モーダル (黒・赤・青・黄・紫・緑・ピンク・白) -->
   <div id="modal-color" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-color')">
     <div class="modal-content">
       <div class="modal-title">ペンの色を選択</div>
@@ -181,7 +183,8 @@
         <button class="pop-color-btn" style="background:#ffcc00; color:#000;" onclick="setPenColor('#ffcc00')">黄</button>
         <button class="pop-color-btn" style="background:#ff00ff; color:#fff;" onclick="setPenColor('#ff00ff')">紫</button>
         <button class="pop-color-btn" style="background:#34c759; color:#fff;" onclick="setPenColor('#34c759')">緑</button>
-        <button class="pop-color-btn" style="background:#ffffff; color:#000; grid-column: span 2;" onclick="setPenColor('#ffffff')">白</button>
+        <button class="pop-color-btn" style="background:#ff69b4; color:#fff;" onclick="setPenColor('#ff69b4')">ピンク</button>
+        <button class="pop-color-btn" style="background:#ffffff; color:#000;" onclick="setPenColor('#ffffff')">白</button>
       </div>
     </div>
   </div>
@@ -206,9 +209,9 @@
         <button class="pop-btn" style="font-size:24px;" onclick="selectStamp('⭐')">⭐</button>
         <button class="pop-btn" style="font-size:24px;" onclick="selectStamp('✨')">✨</button>
         <button class="pop-btn" style="font-size:24px;" onclick="selectStamp('💖')">💖</button>
-        <button class="pop-btn" style="font-size:20px;" onclick="selectStamp('推し')">推し</button>
+        <button class="pop-btn" style="font-size:18px;" onclick="selectStamp('推し')">推し</button>
       </div>
-      <button class="pop-btn" style="margin-top:15px; background:#444;" onclick="cancelStamp()">ペンモードに戻る</button>
+      <button class="pop-btn" style="margin-top:12px; background:#444;" onclick="cancelStamp()">ペンモードに戻る</button>
     </div>
   </div>
 
@@ -256,21 +259,19 @@
       }
     }
 
-    // --- 正確な 3:4 チェキ風レイアウトで撮影 ---
     function takeSnapshot() {
       const hiddenCanvas = document.getElementById('hiddenCanvas');
       const hCtx = hiddenCanvas.getContext('2d');
 
       const targetW = 600;
-      const targetH = 800; // 3:4比率 (600:800)
+      const targetH = 800; // 3:4比率
       hiddenCanvas.width = targetW;
       hiddenCanvas.height = targetH;
 
       hCtx.fillStyle = '#ffffff';
       hCtx.fillRect(0, 0, targetW, targetH);
 
-      // 3:4チェキ風余白（左右上下に綺麗に収める）
-      const pX = 35, pY = 35, pW = 530, pH = 707; // ほぼ3:4
+      const pX = 35, pY = 35, pW = 530, pH = 707;
       const vW = video.videoWidth, vH = video.videoHeight;
       const vAspect = vW / vH, targetAspect = pW / pH;
 
@@ -312,7 +313,7 @@
       document.body.removeChild(downloadLink);
 
       canvas.width = 600;
-      canvas.height = 800; // 3:4
+      canvas.height = 800;
 
       const img = new Image();
       baseImage = img;
@@ -326,7 +327,6 @@
       img.src = url;
     }
 
-    // --- ポップアップモーダル制御 ---
     function openModal(modalId) {
       document.getElementById(modalId).classList.add('active');
     }
@@ -360,7 +360,6 @@
       closeModal('modal-stamp');
     }
 
-    // --- 描画イベント ---
     function initDrawingEvents() {
       canvas.onmousedown = handleCanvasDown;
       canvas.onmousemove = handleCanvasMove;
