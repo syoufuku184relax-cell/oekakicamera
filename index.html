@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>チェキ風アプリ - 撮影プレビューフロー</title>
+  <style>
+    body { text-align: center; background: #222; color: white; font-family: sans-serif; margin: 0; padding: 20px; }
+    .screen { display: none; }
+    .screen.active { display: block; }
+    canvas { max-width: 90vw; max-height: 65vh; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.6); background: white; }
+    button { padding: 14px 28px; font-size: 16px; margin: 10px; cursor: pointer; border: none; border-radius: 30px; font-weight: bold; }
+    .btn-main { background: #ff4081; color: white; }
+    .btn-sub { background: #777; color: white; }
+  </style>
+</head>
+<body>
+
+  <!-- ================= 画面1: 撮影・選択画面 ================= -->
+  <div id="screen-capture" class="screen active">
+    <h2>特典会カメラ</h2>
+    <p>まずは写真を撮影してください</p>
+    <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;">
+    <br>
+    <button class="btn-main" onclick="document.getElementById('cameraInput').click()">📷 写真を撮る / 選ぶ</button>
+  </div>
+
+  <!-- ================= 画面2: プレビュー確認画面 ================= -->
+  <div id="screen-preview" class="screen">
+    <h2>プレビュー確認</h2>
+    <p>この写真で大丈夫ですか？</p>
+    <div>
+      <img id="previewImg" style="max-width: 90vw; max-height: 60vh; border-radius: 8px;" alt="プレビュー">
+    </div>
+    <br>
+    <button class="btn-sub" onclick="retakePhoto()">🔄 撮り直す</button>
+    <button class="btn-main" onclick="confirmAndSavePhoto()">✨ これでOK（描画へ）</button>
+  </div>
+
+  <!-- ================= 画面3: 描画画面（チェキ枠） ================= -->
+  <div id="screen-draw" class="screen">
+    <h2>デコレーション画面</h2>
+    <canvas id="chekiCanvas" width="600" height="850"></canvas>
+    <br>
+    <button class="btn-sub" onclick="backToCapture()">最初に戻る</button>
+  </div>
+
+  <script>
+    let selectedFile = null;
+    let loadedImage = null;
+
+    // 画面を切り替える関数
+    function switchScreen(screenId) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(screenId).classList.add('active');
+    }
+
+    // 1. 写真が選択/撮影されたとき
+    document.getElementById('cameraInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      selectedFile = file;
+
+      // プレビュー用に画面に表示
+      const imageUrl = URL.createObjectURL(file);
+      document.getElementById('previewImg').src = imageUrl;
+
+      // プレビュー画面へ移行
+      switchScreen('screen-preview');
+    });
+
+    // 2. 撮り直すボタン
+    function retakePhoto() {
+      document.getElementById('cameraInput').value = ''; // リセット
+      selectedFile = null;
+      switchScreen('screen-capture');
+    }
+
+    // 3. 「これでOK」ボタン：本体保存 ＆ 描画画面へ
+    function confirmAndSavePhoto() {
+      if (!selectedFile) return;
+
+      // --- ① 本体ストレージ（カメラロール等）への自動保存処理 ---
+      // Web Share API（対応ブラウザならファイルとして共有・保存ダイアログを出せる）
+      // ※スマホのブラウザ環境によっては、リンクタグのdownload属性を使って強制ダウンロードさせます
+      const downloadLink = document.createElement('a');
+      const url = URL.createObjectURL(selectedFile);
+      downloadLink.href = url;
+      downloadLink.download = `cheki_original_${Date.now()}.jpg`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+
+      // --- ② 描画画面（チェキ枠付きキャンバス）の初期化と描画 ---
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.getElementById('chekiCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // チェキ枠を描画
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 写真エリア (3:4)
+        const photoArea = { x: 40, y: 40, width: 520, height: 693 };
+
+        // 3:4に切り抜いて配置
+        const imgAspect = img.width / img.height;
+        const targetAspect = photoArea.width / photoArea.height;
+        let sx, sy, sWidth, sHeight;
+
+        if (imgAspect > targetAspect) {
+          sHeight = img.height;
+          sWidth = img.height * targetAspect;
+          sx = (img.width - sWidth) / 2;
+          sy = 0;
+        } else {
+          sWidth = img.width;
+          sHeight = img.width / targetAspect;
+          sx = 0;
+          sy = (img.height - sHeight) / 2;
+        }
+
+        ctx.drawImage(img, sx, sy, sWidth, sHeight, photoArea.x, photoArea.y, photoArea.width, photoArea.height);
+
+        // 描画画面へ切り替え
+        switchScreen('screen-draw');
+      };
+      img.src = url;
+    }
+
+    function backToCapture() {
+      switchScreen('screen-capture');
+    }
+  </script>
+</body>
+</html>
