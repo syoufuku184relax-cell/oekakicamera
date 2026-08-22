@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>特典会チェキアプリ（描画対応版）</title>
+  <title>特典会チェキアプリ</title>
   <style>
     body { text-align: center; background: #111; color: white; font-family: sans-serif; margin: 0; padding: 10px; touch-action: manipulation; }
     .screen { display: none; }
     .screen.active { display: block; }
     
-    canvas, img { max-width: 90vw; max-height: 55vh; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.6); background: white; object-fit: contain; }
+    canvas, img { max-width: 90vw; max-height: 52vh; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.6); background: white; object-fit: contain; }
     
     /* チェキ風ファインダー */
     .viewfinder-container {
@@ -33,27 +33,39 @@
     button { padding: 12px 20px; font-size: 15px; margin: 5px; cursor: pointer; border: none; border-radius: 25px; font-weight: bold; }
     .btn-main { background: #ff4081; color: white; }
     .btn-sub { background: #777; color: white; }
+    .btn-clear { background: #d9534f; color: white; }
     .btn-action-row { margin-top: 10px; }
 
     /* 描画ツール用コントロールパネル */
     .tool-panel {
       background: #222;
-      padding: 10px;
+      padding: 8px;
       border-radius: 10px;
-      margin-top: 10px;
+      margin-top: 8px;
       display: inline-block;
       max-width: 95vw;
     }
-    .color-btn { width: 30px; height: 30px; border-radius: 50%; border: 2px solid white; display: inline-block; margin: 0 4px; cursor: pointer; vertical-align: middle; }
+    
+    /* カラーボタン（色名表示） */
+    .color-btn {
+      width: 36px; height: 36px; border-radius: 50%; border: 2px solid white;
+      display: inline-flex; align-items: center; justify-content: center;
+      margin: 0 3px; cursor: pointer; vertical-align: middle;
+      font-size: 11px; font-weight: bold;
+    }
     .color-btn.active { border: 3px solid #ff4081; transform: scale(1.1); }
-    .size-btn { padding: 6px 12px; font-size: 13px; border-radius: 15px; background: #444; color: white; border: 1px solid #666; margin: 0 2px; }
+    
+    .size-btn { padding: 5px 10px; font-size: 12px; border-radius: 15px; background: #444; color: white; border: 1px solid #666; margin: 0 2px; }
     .size-btn.active { background: #ff4081; border-color: #ff4081; }
-    .stamp-btn { font-size: 20px; padding: 5px 10px; background: #333; border-radius: 8px; border: 1px solid #555; margin: 0 3px; cursor: pointer; }
+    
+    /* スタンプボタン */
+    .stamp-btn { font-size: 20px; padding: 4px 10px; background: #333; border-radius: 8px; border: 1px solid #555; margin: 0 3px; cursor: pointer; }
+    .stamp-btn.active { background: #ff4081; border-color: white; }
   </style>
 </head>
 <body>
 
-  <!-- ================= 画面1: 起動直後・即カメラモード ================= -->
+  <!-- ================= 画面1: 即カメラモード ================= -->
   <div id="screen-capture" class="screen active">
     <div class="viewfinder-container">
       <video id="cameraStream" autoplay playsinline muted></video>
@@ -80,31 +92,36 @@
   <div id="screen-draw" class="screen">
     <canvas id="chekiCanvas"></canvas>
     
-    <!-- 現場で爆速切り替えできるツールパネル -->
+    <!-- ツールパネル -->
     <div class="tool-panel">
-      <!-- カラーパレット -->
+      <!-- ペンカラー（黒・赤・青・黄・紫・緑・白） -->
       <div>
-        <span class="color-btn active" style="background:#000000;" onclick="setPenColor('#000000', this)"></span>
-        <span class="color-btn" style="background:#ff3b30;" onclick="setPenColor('#ff3b30', this)"></span>
-        <span class="color-btn" style="background:#007aff;" onclick="setPenColor('#007aff', this)"></span>
-        <span class="color-btn" style="background:#ff2d55;" onclick="setPenColor('#ff2d55', this)"></span>
-        <span class="color-btn" style="background:#ffffff;" onclick="setPenColor('#ffffff', this)"></span>
-        <span class="color-btn" style="background:#ffcc00;" onclick="setPenColor('#ffcc00', this)"></span>
+        <span class="color-btn active" style="background:#000000; color:#fff;" onclick="setPenColor('#000000', this)">黒</span>
+        <span class="color-btn" style="background:#ff3b30; color:#fff;" onclick="setPenColor('#ff3b30', this)">赤</span>
+        <span class="color-btn" style="background:#007aff; color:#fff;" onclick="setPenColor('#007aff', this)">青</span>
+        <span class="color-btn" style="background:#ffcc00; color:#000;" onclick="setPenColor('#ffcc00', this)">黄</span>
+        <span class="color-btn" style="background:#ff00ff; color:#fff;" onclick="setPenColor('#ff00ff', this)">紫</span>
+        <span class="color-btn" style="background:#34c759; color:#fff;" onclick="setPenColor('#34c759', this)">緑</span>
+        <span class="color-btn" style="background:#ffffff; color:#000;" onclick="setPenColor('#ffffff', this)">白</span>
       </div>
-      <!-- 太さ調整 -->
-      <div style="margin-top: 8px;">
+
+      <!-- ペン太さ & 戻す & クリア -->
+      <div style="margin-top: 6px;">
         <button class="size-btn" onclick="setPenSize(3, this)">細</button>
         <button class="size-btn active" onclick="setPenSize(7, this)">中</button>
         <button class="size-btn" onclick="setPenSize(14, this)">太</button>
-        <button class="btn-sub" style="padding:4px 10px; font-size:12px; margin-left:10px;" onclick="undoCanvas()">↩️ 戻す</button>
+        <button class="size-btn" style="background:#555;" onclick="undoCanvas()">↩️戻す</button>
+        <button class="size-btn btn-clear" style="background:#b52b27; border:none;" onclick="clearCanvas()">🗑️クリア</button>
       </div>
-      <!-- スタンプポン置き -->
-      <div style="margin-top: 8px;">
-        <span style="font-size:12px; color:#aaa; margin-right:5px;">スタンプ:</span>
-        <button class="stamp-btn" onclick="addStamp('⭐')">⭐</button>
-        <button class="stamp-btn" onclick="addStamp('✨')">✨</button>
-        <button class="stamp-btn" onclick="addStamp('💖')">💖</button>
-        <button class="stamp-btn" onclick="addStamp('推し')">推し</button>
+
+      <!-- スタンプ選択（タップして配置モード切り替え） -->
+      <div style="margin-top: 6px;">
+        <span style="font-size:11px; color:#aaa; margin-right:3px;">スタンプ:</span>
+        <button class="stamp-btn" onclick="selectStamp('⭐', this)">⭐</button>
+        <button class="stamp-btn" onclick="selectStamp('✨', this)">✨</button>
+        <button class="stamp-btn" onclick="selectStamp('💖', this)">💖</button>
+        <button class="stamp-btn" onclick="selectStamp('推し', this)">推し</button>
+        <button class="size-btn" style="background:#333; margin-left:5px;" onclick="cancelStamp()">ペンに戻る</button>
       </div>
     </div>
 
@@ -119,20 +136,20 @@
     let mediaStream = null;
     let capturedBlob = null;
 
-    // 描画用の変数
     const canvas = document.getElementById('chekiCanvas');
     const ctx = canvas.getContext('2d');
     let isDrawing = false;
     let penColor = '#000000';
     let penSize = 7;
-    let history = []; // Undo用履歴
+    let selectedStamp = null; // 選択中のスタンプ
+    let history = [];
+    let baseImage = null; // クリア用・ベース画像
 
     function switchScreen(screenId) {
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
       document.getElementById(screenId).classList.add('active');
     }
 
-    // --- カメラ起動 ---
     async function startCamera() {
       switchScreen('screen-capture');
       try {
@@ -158,7 +175,6 @@
       }
     }
 
-    // --- 撮影 ---
     function takeSnapshot() {
       const hiddenCanvas = document.getElementById('hiddenCanvas');
       const hCtx = hiddenCanvas.getContext('2d');
@@ -179,7 +195,7 @@
       if (vAspect > targetAspect) {
         sH = vH; sW = vH * targetAspect; sx = (vW - sW) / 2; sy = 0;
       } else {
-        sW = vW; sH = vW / targetAspect; sx = 0; sy = (vH - sH) / 2;
+        sW = vW; sH = vH / targetAspect; sx = 0; sy = (vH - sH) / 2;
       }
 
       hCtx.drawImage(video, sx, sy, sW, sH, pX, pY, pW, pH);
@@ -201,39 +217,48 @@
       startCamera();
     }
 
-    // --- プレビューから描画画面へ移行 ---
+    // --- プレビュー確認：「これでOK」で即保存 ＆ 描画画面へ ---
     function confirmPhoto() {
       if (!capturedBlob) return;
+
+      // 自動保存処理
+      const downloadLink = document.createElement('a');
+      const url = URL.createObjectURL(capturedBlob);
+      downloadLink.href = url;
+      downloadLink.download = `cheki_original_${Date.now()}.jpg`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
 
       canvas.width = 600;
       canvas.height = 850;
 
       const img = new Image();
+      baseImage = img; // クリア用に保持
       img.onload = function() {
         ctx.drawImage(img, 0, 0);
-        saveHistory(); // 初期状態を履歴に保存
+        history = [];
+        saveHistory();
         switchScreen('screen-draw');
         initDrawingEvents();
       };
-      img.src = URL.createObjectURL(capturedBlob);
+      img.src = url;
     }
 
-    // --- 手描きシステムのイベント設定 ---
+    // --- 描画＆スタンプ操作イベント ---
     function initDrawingEvents() {
-      // 既存のリスナー重複を防ぐため一度クローンするなどの処理は簡易化のため省略
-      canvas.onmousedown = startDraw;
-      canvas.onmousemove = draw;
-      canvas.onmouseup = endDraw;
-      canvas.onmouseleave = endDraw;
+      canvas.onmousedown = handleCanvasDown;
+      canvas.onmousemove = handleCanvasMove;
+      canvas.onmouseup = handleCanvasUp;
+      canvas.onmouseleave = handleCanvasUp;
 
-      canvas.ontouchstart = (e) => { e.preventDefault(); startDraw(e.touches[0]); };
-      canvas.ontouchmove = (e) => { e.preventDefault(); draw(e.touches[0]); };
-      canvas.ontouchend = endDraw;
+      canvas.ontouchstart = (e) => { e.preventDefault(); handleCanvasDown(e.touches[0]); };
+      canvas.ontouchmove = (e) => { e.preventDefault(); handleCanvasMove(e.touches[0]); };
+      canvas.ontouchend = handleCanvasUp;
     }
 
     function getMousePos(e) {
       const rect = canvas.getBoundingClientRect();
-      // 表示サイズとCanvas内部解像度の比率を計算
       const scaleX = canvas.width / rect.width;
       const scaleY = canvas.height / rect.height;
       return {
@@ -242,48 +267,72 @@
       };
     }
 
-    function startDraw(e) {
-      isDrawing = true;
+    function handleCanvasDown(e) {
       const pos = getMousePos(e);
-      ctx.beginPath();
-      ctx.moveTo(pos.x, pos.y);
-      ctx.strokeStyle = penColor;
-      ctx.lineWidth = penSize;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
+
+      if (selectedStamp) {
+        // スタンプ配置モードのとき：タップした場所にスタンプを置く
+        ctx.save();
+        ctx.font = 'bold 50px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = 'white';
+        ctx.shadowBlur = 10;
+        ctx.fillText(selectedStamp, pos.x, pos.y);
+        ctx.restore();
+        saveHistory();
+      } else {
+        // 通常のペン描きモード
+        isDrawing = true;
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+        ctx.strokeStyle = penColor;
+        ctx.lineWidth = penSize;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+      }
     }
 
-    function draw(e) {
-      if (!isDrawing) return;
+    function handleCanvasMove(e) {
+      if (!isDrawing || selectedStamp) return;
       const pos = getMousePos(e);
       ctx.lineTo(pos.x, pos.y);
       ctx.stroke();
     }
 
-    function endDraw() {
+    function handleCanvasUp() {
       if (isDrawing) {
         isDrawing = false;
         saveHistory();
       }
     }
 
-    // --- 履歴（Undo）管理 ---
+    // --- 履歴・クリア管理 ---
     function saveHistory() {
-      if (history.length > 10) history.shift(); // メモリ節約のため最大10件
+      if (history.length > 15) history.shift();
       history.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
     }
 
     function undoCanvas() {
       if (history.length > 1) {
-        history.pop(); // 現在の最新を捨てる
+        history.pop();
         const prev = history[history.length - 1];
         ctx.putImageData(prev, 0, 0);
       }
     }
 
-    // --- ペン設定 ---
+    function clearCanvas() {
+      if (baseImage) {
+        ctx.drawImage(baseImage, 0, 0);
+        history = [];
+        saveHistory();
+      }
+    }
+
+    // --- ツール選択 ---
     function setPenColor(color, element) {
       penColor = color;
+      cancelStamp(); // スタンプモード解除
       document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
       element.classList.add('active');
     }
@@ -291,28 +340,18 @@
     function setPenSize(size, element) {
       penSize = size;
       document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+      if(element) element.classList.add('active');
+    }
+
+    function selectStamp(stampText, element) {
+      selectedStamp = stampText;
+      document.querySelectorAll('.stamp-btn').forEach(b => b.classList.remove('active'));
       element.classList.add('active');
     }
 
-    // --- スタンプポン置き機能 ---
-    function addStamp(text) {
-      // 余白エリア（チェキの下部あたり、ランダムまたは中心に配置）
-      const x = 100 + Math.random() * 400;
-      const y = 740 + Math.random() * 60;
-
-      ctx.save();
-      ctx.font = 'bold 45px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      
-      // スタンプっぽく白いフチ（シャドウ）をつける
-      ctx.shadowColor = 'white';
-      ctx.shadowBlur = 10;
-      
-      ctx.fillText(text, x, y);
-      ctx.restore();
-
-      saveHistory();
+    function cancelStamp() {
+      selectedStamp = null;
+      document.querySelectorAll('.stamp-btn').forEach(b => b.classList.remove('active'));
     }
 
     // --- 最終保存処理 ---
@@ -324,7 +363,7 @@
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        alert('チェキを保存しました！');
+        alert('デコチェキを保存しました！');
       }, 'image/jpeg', 0.9);
     }
 
