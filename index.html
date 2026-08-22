@@ -3,135 +3,194 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>チェキ風アプリ - 撮影プレビューフロー</title>
+  <title>特典会チェキアプリ</title>
   <style>
-    body { text-align: center; background: #222; color: white; font-family: sans-serif; margin: 0; padding: 20px; }
+    body { text-align: center; background: #111; color: white; font-family: sans-serif; margin: 0; padding: 10px; }
     .screen { display: none; }
     .screen.active { display: block; }
-    canvas { max-width: 90vw; max-height: 65vh; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.6); background: white; }
+    
+    canvas, img { max-width: 90vw; max-height: 65vh; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.6); background: white; object-fit: contain; }
+    
+    /* チェキ風ファインダー */
+    .viewfinder-container {
+      position: relative;
+      display: inline-block;
+      background: white;
+      padding: 15px 15px 50px 15px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+      border-radius: 6px;
+      margin-top: 10px;
+    }
+    video {
+      width: 100%;
+      max-width: 380px;
+      aspect-ratio: 3 / 4;
+      object-fit: cover;
+      background: #000;
+      display: block;
+    }
+
     button { padding: 14px 28px; font-size: 16px; margin: 10px; cursor: pointer; border: none; border-radius: 30px; font-weight: bold; }
     .btn-main { background: #ff4081; color: white; }
     .btn-sub { background: #777; color: white; }
+    .btn-action-row { margin-top: 15px; }
   </style>
 </head>
 <body>
 
-  <!-- ================= 画面1: 撮影・選択画面 ================= -->
+  <!-- ================= 画面1: 起動直後・即カメラモード ================= -->
   <div id="screen-capture" class="screen active">
-    <h2>特典会カメラ</h2>
-    <p>まずは写真を撮影してください</p>
-    <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;">
-    <br>
-    <button class="btn-main" onclick="document.getElementById('cameraInput').click()">📷 写真を撮る / 選ぶ</button>
+    <div class="viewfinder-container">
+      <video id="cameraStream" autoplay playsinline muted></video>
+    </div>
+    <div>
+      <button class="btn-main" onclick="takeSnapshot()">シャッター 📸</button>
+    </div>
+    <canvas id="hiddenCanvas" style="display:none;"></canvas>
   </div>
 
   <!-- ================= 画面2: プレビュー確認画面 ================= -->
   <div id="screen-preview" class="screen">
-    <h2>プレビュー確認</h2>
-    <p>この写真で大丈夫ですか？</p>
+    <h3>👀 プレビュー確認</h3>
     <div>
-      <img id="previewImg" style="max-width: 90vw; max-height: 60vh; border-radius: 8px;" alt="プレビュー">
+      <img id="previewImg" alt="プレビュー">
     </div>
-    <br>
-    <button class="btn-sub" onclick="retakePhoto()">🔄 撮り直す</button>
-    <button class="btn-main" onclick="confirmAndSavePhoto()">✨ これでOK（描画へ）</button>
+    <div class="btn-action-row">
+      <button class="btn-sub" onclick="retakePhoto()">🔄 撮り直す</button>
+      <button class="btn-main" onclick="confirmPhoto()">✨ これでOK（描画へ）</button>
+    </div>
   </div>
 
-  <!-- ================= 画面3: 描画画面（チェキ枠） ================= -->
+  <!-- ================= 画面3: 描画（デコ）画面 ================= -->
   <div id="screen-draw" class="screen">
-    <h2>デコレーション画面</h2>
-    <canvas id="chekiCanvas" width="600" height="850"></canvas>
-    <br>
-    <button class="btn-sub" onclick="backToCapture()">最初に戻る</button>
+    <h3>🎨 デコレーション画面</h3>
+    <canvas id="chekiCanvas"></canvas>
+    <div class="btn-action-row">
+      <button class="btn-sub" onclick="retakePhoto()">最初に戻る</button>
+    </div>
   </div>
 
   <script>
-    let selectedFile = null;
-    let loadedImage = null;
+    const video = document.getElementById('cameraStream');
+    let mediaStream = null;
+    let capturedBlob = null;
 
-    // 画面を切り替える関数
     function switchScreen(screenId) {
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
       document.getElementById(screenId).classList.add('active');
     }
 
-    // 1. 写真が選択/撮影されたとき
-    document.getElementById('cameraInput').addEventListener('change', function(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      selectedFile = file;
-
-      // プレビュー用に画面に表示
-      const imageUrl = URL.createObjectURL(file);
-      document.getElementById('previewImg').src = imageUrl;
-
-      // プレビュー画面へ移行
-      switchScreen('screen-preview');
-    });
-
-    // 2. 撮り直すボタン
-    function retakePhoto() {
-      document.getElementById('cameraInput').value = ''; // リセット
-      selectedFile = null;
+    // --- 起動と同時にカメラを起動 ---
+    async function startCamera() {
       switchScreen('screen-capture');
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false
+        });
+        video.srcObject = mediaStream;
+      } catch (err) {
+        // 万が一カメラ起動がブロックされた場合の救済（画面どこでもタップで再挑戦）
+        console.warn('自動カメラ起動がブロックされました。画面をタップして再試行します。', err);
+        document.body.addEventListener('click', retryCameraOnce, { once: true });
+      }
     }
 
-    // 3. 「これでOK」ボタン：本体保存 ＆ 描画画面へ
-    function confirmAndSavePhoto() {
-      if (!selectedFile) return;
+    async function retryCameraOnce() {
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false
+        });
+        video.srcObject = mediaStream;
+      } catch (e) {
+        alert('カメラのアクセスを許可してください。');
+      }
+    }
 
-      // --- ① 本体ストレージ（カメラロール等）への自動保存処理 ---
-      // Web Share API（対応ブラウザならファイルとして共有・保存ダイアログを出せる）
-      // ※スマホのブラウザ環境によっては、リンクタグのdownload属性を使って強制ダウンロードさせます
+    // --- シャッターを切る ---
+    function takeSnapshot() {
+      const hiddenCanvas = document.getElementById('hiddenCanvas');
+      const hCtx = hiddenCanvas.getContext('2d');
+
+      const targetW = 600;
+      const targetH = 850;
+      hiddenCanvas.width = targetW;
+      hiddenCanvas.height = targetH;
+
+      // 白枠
+      hCtx.fillStyle = '#ffffff';
+      hCtx.fillRect(0, 0, targetW, targetH);
+
+      // 写真エリア (3:4)
+      const pX = 40;
+      const pY = 40;
+      const pW = 520;
+      const pH = 693;
+
+      const vW = video.videoWidth;
+      const vH = video.videoHeight;
+      const vAspect = vW / vH;
+      const targetAspect = pW / pH;
+
+      let sx, sy, sW, sH;
+      if (vAspect > targetAspect) {
+        sH = vH;
+        sW = vH * targetAspect;
+        sx = (vW - sW) / 2;
+        sy = 0;
+      } else {
+        sW = vW;
+        sH = vW / targetAspect;
+        sx = 0;
+        sy = (vH - sH) / 2;
+      }
+
+      hCtx.drawImage(video, sx, sy, sW, sH, pX, pY, pW, pH);
+
+      hiddenCanvas.toBlob(function(blob) {
+        capturedBlob = blob;
+        const imageUrl = URL.createObjectURL(blob);
+        document.getElementById('previewImg').src = imageUrl;
+
+        if (mediaStream) {
+          mediaStream.getTracks().forEach(track => track.stop());
+        }
+
+        switchScreen('screen-preview');
+      }, 'image/jpeg', 0.85);
+    }
+
+    function retakePhoto() {
+      capturedBlob = null;
+      startCamera();
+    }
+
+    function confirmPhoto() {
+      if (!capturedBlob) return;
+
       const downloadLink = document.createElement('a');
-      const url = URL.createObjectURL(selectedFile);
+      const url = URL.createObjectURL(capturedBlob);
       downloadLink.href = url;
-      downloadLink.download = `cheki_original_${Date.now()}.jpg`;
+      downloadLink.download = `cheki_${Date.now()}.jpg`;
       document.body.appendChild(downloadLink);
       downloadLink.click();
       document.body.removeChild(downloadLink);
 
-      // --- ② 描画画面（チェキ枠付きキャンバス）の初期化と描画 ---
+      const chekiCanvas = document.getElementById('chekiCanvas');
+      const ctx = chekiCanvas.getContext('2d');
+      chekiCanvas.width = 600;
+      chekiCanvas.height = 850;
+
       const img = new Image();
       img.onload = function() {
-        const canvas = document.getElementById('chekiCanvas');
-        const ctx = canvas.getContext('2d');
-        
-        // チェキ枠を描画
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // 写真エリア (3:4)
-        const photoArea = { x: 40, y: 40, width: 520, height: 693 };
-
-        // 3:4に切り抜いて配置
-        const imgAspect = img.width / img.height;
-        const targetAspect = photoArea.width / photoArea.height;
-        let sx, sy, sWidth, sHeight;
-
-        if (imgAspect > targetAspect) {
-          sHeight = img.height;
-          sWidth = img.height * targetAspect;
-          sx = (img.width - sWidth) / 2;
-          sy = 0;
-        } else {
-          sWidth = img.width;
-          sHeight = img.width / targetAspect;
-          sx = 0;
-          sy = (img.height - sHeight) / 2;
-        }
-
-        ctx.drawImage(img, sx, sy, sWidth, sHeight, photoArea.x, photoArea.y, photoArea.width, photoArea.height);
-
-        // 描画画面へ切り替え
+        ctx.drawImage(img, 0, 0);
         switchScreen('screen-draw');
       };
       img.src = url;
     }
 
-    function backToCapture() {
-      switchScreen('screen-capture');
-    }
+    window.addEventListener('load', startCamera);
   </script>
 </body>
 </html>
