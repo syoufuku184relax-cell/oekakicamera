@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>特典会チェキアプリ（グループ名・データ連携対応版）</title>
+  <title>特典会チェキアプリ（複数グループ対応版）</title>
   <style>
     /* 画面のスクロールや引っ張り更新を完全に防止 */
     html, body {
@@ -82,7 +82,7 @@
       background: white;
       object-fit: contain;
       touch-action: none;
-      margin-top: 50px; /* ツールバーと被らないよう上部に配置 */
+      margin-top: 50px;
     }
 
     button { font-size: 14px; cursor: pointer; border: none; border-radius: 20px; font-weight: bold; }
@@ -181,15 +181,15 @@
     .setting-group input {
       width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #555; background: #333; color: white; box-sizing: border-box;
     }
-    .idol-item-row {
+    .item-row {
       display: flex; align-items: center; justify-content: space-between;
       background: #2a2a2a; padding: 6px 10px; border-radius: 6px; margin-bottom: 4px; font-size: 13px;
     }
-    .select-idol-row {
+    .select-row {
       display: flex; align-items: center; justify-content: space-between;
       background: #333; padding: 10px 12px; border-radius: 8px; margin-bottom: 6px; cursor: pointer; border: 1px solid #555;
     }
-    .select-idol-row:active { background: #444; }
+    .select-row:active { background: #444; }
   </style>
 </head>
 <body>
@@ -197,7 +197,7 @@
   <!-- ================= 画面1: カメラ撮影（常時合成プレビュー） ================= -->
   <div id="screen-capture" class="screen active">
     <div style="position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; align-items: center; z-index: 5;">
-      <div id="currentInfoDisplay" onclick="openModal('modal-select-idol')" style="font-size: 12px; background: rgba(0,0,0,0.7); padding: 6px 12px; border-radius: 12px; border: 1px solid #777; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+      <div id="currentInfoDisplay" onclick="openModal('modal-select-target')" style="font-size: 12px; background: rgba(0,0,0,0.7); padding: 6px 12px; border-radius: 12px; border: 1px solid #777; cursor: pointer; display: flex; align-items: center; gap: 6px;">
         読み込み中...
       </div>
       <button class="btn-sub" style="padding: 6px 12px; font-size: 12px;" onclick="openModal('modal-settings')">⚙️ 設定</button>
@@ -249,11 +249,18 @@
 
   <!-- ================= 各種ポップアップモーダル ================= -->
 
-  <div id="modal-select-idol" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-select-idol')">
+  <!-- グループ・メンバー選択モーダル -->
+  <div id="modal-select-target" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-select-target')">
     <div class="modal-content">
-      <div class="modal-title">撮影メンバーを選択</div>
-      <div id="modalIdolSelectList" style="max-height: 250px; overflow-y: auto; margin-bottom: 10px;"></div>
-      <button class="pop-btn" style="background:#444;" onclick="closeModal('modal-select-idol')">閉じる</button>
+      <div class="modal-title">グループ & メンバー選択</div>
+      
+      <div style="font-size: 12px; color: #aaa; text-align: left; margin-bottom: 4px;">📂 グループを選択</div>
+      <div id="modalGroupSelectList" style="max-height: 120px; overflow-y: auto; margin-bottom: 12px;"></div>
+
+      <div style="font-size: 12px; color: #aaa; text-align: left; margin-bottom: 4px;">👤 メンバーを選択</div>
+      <div id="modalIdolSelectList" style="max-height: 150px; overflow-y: auto; margin-bottom: 10px;"></div>
+
+      <button class="pop-btn" style="background:#444;" onclick="closeModal('modal-select-target')">閉じる</button>
     </div>
   </div>
 
@@ -285,22 +292,20 @@
         <button class="pop-btn" style="font-size:24px;" onclick="selectStamp('💖')">💖</button>
         <button class="pop-btn" style="font-size:18px;" onclick="selectStamp('推し')">推し</button>
       </div>
-      <button class="pop-btn" style="margin-top:10px; background:#444;" onclick="cancelStamp()">ペンモードに戻る</button>
+      <button class="pop-btn" style="margin-top:10px; background:#444;" onclick="cancelStamp()">ペンに戻る</button>
     </div>
   </div>
 
   <div id="modal-saved" class="modal-overlay">
     <div class="modal-content" style="text-align:center;">
-      <div class="modal-title" style="color:#28a745;">💾 デコ済み画像の保存完了！</div>
+      <div class="modal-title" style="color:#28a745;">💾 保存完了！</div>
       <img id="savedResultImage" style="width: 100%; border-radius: 6px; margin: 10px 0; aspect-ratio:3/4; object-fit:contain; background:#000;" alt="保存画像">
-      
-      <!-- Cloudinary連携プレースホルダー（将来の拡張用） -->
       <div id="metaInfoBox" style="font-size:11px; color:#aaa; background:#181818; padding:6px; border-radius:4px; margin-bottom:10px; text-align:left;"></div>
-
       <button class="btn-main" style="width:100%; padding:10px; margin-top:5px;" onclick="finishAndResetCamera()">次の撮影へ 📸</button>
     </div>
   </div>
 
+  <!-- 設定モーダル（複数グループ・メンバー管理） -->
   <div id="modal-settings" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-settings')">
     <div class="modal-content">
       <div class="modal-title">アプリ設定 ＆ グループ管理</div>
@@ -309,25 +314,26 @@
         <label>端末ID</label>
         <input type="text" id="settingDeviceId" placeholder="例: DEV-01">
       </div>
+
+      <!-- グループ一覧と追加 -->
       <div class="setting-group">
-        <label>グループ名</label>
-        <input type="text" id="settingGroupName" placeholder="例: 推しグループ名">
+        <label>登録グループ一覧</label>
+        <div id="groupListContainer" style="max-height: 80px; overflow-y: auto; border: 1px solid #444; border-radius: 6px; padding: 4px; background:#181818; margin-bottom:4px;"></div>
+        <div style="display:flex; gap:4px;">
+          <input type="text" id="newGroupNameInput" placeholder="新しいグループ名" style="font-size:12px; padding:6px;">
+          <button class="pop-btn" style="width:90px; background:#449d44; padding:6px; font-size:11px;" onclick="addGroup()">追加</button>
+        </div>
       </div>
 
+      <!-- メンバー一覧と追加 -->
       <div class="setting-group">
         <label>登録メンバー一覧</label>
-        <div id="idolListContainer" style="max-height: 90px; overflow-y: auto; border: 1px solid #444; border-radius: 6px; padding: 4px; background:#181818;"></div>
-      </div>
-
-      <div style="background: #2a2a2a; padding: 8px; border-radius: 8px; border: 1px dashed #666; margin-bottom: 10px;">
-        <label style="font-size: 12px; color: #ff4081; font-weight: bold; margin-bottom: 4px; display:block;">➕ メンバーを追加</label>
-        <input type="text" id="newIdolName" placeholder="メンバー名" style="width:100%; padding:6px; background:#333; color:white; border:1px solid #555; border-radius:4px; font-size:12px; margin-bottom:6px; box-sizing:border-box;">
-        
-        <label style="font-size: 11px; color: #aaa; margin-bottom: 2px; display:block;">メンカラを選択:</label>
+        <div id="idolListContainer" style="max-height: 90px; overflow-y: auto; border: 1px solid #444; border-radius: 6px; padding: 4px; background:#181818; margin-bottom:4px;"></div>
+        <input type="text" id="newIdolName" placeholder="メンバー名" style="font-size:12px; padding:6px; margin-bottom:4px;">
+        <label style="font-size: 11px; color: #aaa; margin-bottom: 2px; display:block;">メンカラ選択:</label>
         <div id="settingColorPaletteContainer" class="color-palette-grid" style="margin-bottom:6px;"></div>
-        
         <div id="selectedColorPreview" style="font-size: 11px; margin-bottom: 6px; color: #ffcc00;">選択中カラー: 赤</div>
-        <button class="pop-btn" style="width: 100%; background: #449d44; padding: 6px; font-size: 12px;" onclick="addNewIdol()">リストに追加する</button>
+        <button class="pop-btn" style="width: 100%; background: #449d44; padding: 6px; font-size: 12px;" onclick="addNewIdol()">メンバーを追加する</button>
       </div>
 
       <button class="btn-main" style="width:100%; margin-top:5px; padding:10px;" onclick="saveSettings()">設定を保存して閉じる</button>
@@ -361,7 +367,8 @@
 
     let appConfig = {
       deviceId: "DEV-01",
-      groupName: "サンプルグループ",
+      groups: ["グループA", "グループB"],
+      selectedGroupIndex: 0,
       idols: [
         { name: "メンバーA", color: "#FF69B4" },
         { name: "メンバーB", color: "#0000FF" }
@@ -371,12 +378,17 @@
 
     let newIdolSelectedColor = "#FF0000";
     let cachedSerialId = "";
-    let currentMetadata = {}; // 撮影時のメタデータ保存用
+    let currentMetadata = {};
 
     function loadSettings() {
-      const saved = localStorage.getItem('cheki_app_config');
+      const saved = localStorage.getItem('cheki_app_config_multi');
       if (saved) {
-        try { appConfig = JSON.parse(saved); } catch(e) {}
+        try {
+          appConfig = JSON.parse(saved);
+          // 互換性維持のためのフォールバック
+          if(!appConfig.groups) appConfig.groups = ["グループA"];
+          if(appConfig.selectedGroupIndex === undefined) appConfig.selectedGroupIndex = 0;
+        } catch(e) {}
       }
       generateSerialId();
       buildColorPalettes();
@@ -425,13 +437,26 @@
 
     function updateSettingsUI() {
       document.getElementById('settingDeviceId').value = appConfig.deviceId || "DEV-01";
-      document.getElementById('settingGroupName').value = appConfig.groupName || "";
       
+      // グループ一覧リスト（設定画面内）
+      const groupContainer = document.getElementById('groupListContainer');
+      groupContainer.innerHTML = '';
+      appConfig.groups.forEach((gName, idx) => {
+        let row = document.createElement('div');
+        row.className = 'item-row';
+        row.innerHTML = `
+          <span>📁 ${gName}</span>
+          <button style="background:#b52b27; color:white; border:none; padding:2px 6px; border-radius:4px; font-size:11px;" onclick="removeGroup(${idx})">削除</button>
+        `;
+        groupContainer.appendChild(row);
+      });
+
+      // メンバー一覧リスト（設定画面内）
       const container = document.getElementById('idolListContainer');
       container.innerHTML = '';
       appConfig.idols.forEach((idol, idx) => {
         let row = document.createElement('div');
-        row.className = 'idol-item-row';
+        row.className = 'item-row';
         row.innerHTML = `
           <div style="display:flex; align-items:center; gap:6px;">
             <span style="width:14px; height:14px; background:${idol.color}; border:1px solid #fff; border-radius:50%; display:inline-block;"></span>
@@ -442,11 +467,33 @@
         container.appendChild(row);
       });
 
+      // 撮影画面の選択モーダル：グループ一覧
+      const modalGroupList = document.getElementById('modalGroupSelectList');
+      modalGroupList.innerHTML = '';
+      appConfig.groups.forEach((gName, idx) => {
+        let row = document.createElement('div');
+        row.className = 'select-row';
+        let isSelected = (idx === appConfig.selectedGroupIndex);
+        row.style.border = isSelected ? '2px solid #ff4081' : '1px solid #555';
+        row.innerHTML = `
+          <span style="font-weight:bold; font-size:13px;">📁 ${gName}</span>
+          <span style="font-size:12px; color:${isSelected ? '#ff4081' : '#aaa'};">${isSelected ? '選択中 ✓' : '選択'}</span>
+        `;
+        row.onclick = () => {
+          appConfig.selectedGroupIndex = idx;
+          localStorage.setItem('cheki_app_config_multi', JSON.stringify(appConfig));
+          updateSettingsUI();
+          updateLiveFrameStyle();
+        };
+        modalGroupList.appendChild(row);
+      });
+
+      // 撮影画面の選択モーダル：メンバー一覧
       const selectModalList = document.getElementById('modalIdolSelectList');
       selectModalList.innerHTML = '';
       appConfig.idols.forEach((idol, idx) => {
         let row = document.createElement('div');
-        row.className = 'select-idol-row';
+        row.className = 'select-row';
         let isSelected = (idx === appConfig.selectedIndex);
         row.style.border = isSelected ? '2px solid #ff4081' : '1px solid #555';
         row.innerHTML = `
@@ -458,18 +505,18 @@
         `;
         row.onclick = () => {
           appConfig.selectedIndex = idx;
-          localStorage.setItem('cheki_app_config', JSON.stringify(appConfig));
+          localStorage.setItem('cheki_app_config_multi', JSON.stringify(appConfig));
           updateSettingsUI();
           updateLiveFrameStyle();
-          closeModal('modal-select-idol');
         };
         selectModalList.appendChild(row);
       });
 
+      let currentGroup = appConfig.groups[appConfig.selectedGroupIndex] || "グループ";
       let currentIdol = appConfig.idols[appConfig.selectedIndex] || appConfig.idols[0];
       document.getElementById('currentInfoDisplay').innerHTML = `
         <span style="width:10px; height:10px; background:${currentIdol ? currentIdol.color : '#fff'}; border-radius:50%; display:inline-block;"></span>
-        <span>[${appConfig.groupName}] ${currentIdol ? currentIdol.name : ''} ▾</span>
+        <span>[${currentGroup}] ${currentIdol ? currentIdol.name : ''} ▾</span>
       `;
 
       updateLiveFrameStyle();
@@ -489,10 +536,35 @@
       document.getElementById('liveSerialText').innerText = cachedSerialId;
     }
 
+    function addGroup() {
+      const input = document.getElementById('newGroupNameInput');
+      const name = input.value.trim();
+      if(!name) {
+        alert('グループ名を入力してください。');
+        return;
+      }
+      appConfig.groups.push(name);
+      input.value = '';
+      updateSettingsUI();
+      localStorage.setItem('cheki_app_config_multi', JSON.stringify(appConfig));
+    }
+
+    function removeGroup(idx) {
+      if(appConfig.groups.length <= 1) {
+        alert('最低1つのグループが必要です。');
+        return;
+      }
+      appConfig.groups.splice(idx, 1);
+      if(appConfig.selectedGroupIndex >= appConfig.groups.length) {
+        appConfig.selectedGroupIndex = appConfig.groups.length - 1;
+      }
+      updateSettingsUI();
+      localStorage.setItem('cheki_app_config_multi', JSON.stringify(appConfig));
+    }
+
     function addNewIdol() {
       const nameInput = document.getElementById('newIdolName');
       const name = nameInput.value.trim();
-      
       if(!name) {
         alert('メンバー名を入力してください。');
         return;
@@ -500,7 +572,7 @@
       appConfig.idols.push({ name: name, color: newIdolSelectedColor });
       nameInput.value = '';
       updateSettingsUI();
-      localStorage.setItem('cheki_app_config', JSON.stringify(appConfig));
+      localStorage.setItem('cheki_app_config_multi', JSON.stringify(appConfig));
     }
 
     function removeIdol(idx) {
@@ -513,14 +585,12 @@
         appConfig.selectedIndex = appConfig.idols.length - 1;
       }
       updateSettingsUI();
-      localStorage.setItem('cheki_app_config', JSON.stringify(appConfig));
+      localStorage.setItem('cheki_app_config_multi', JSON.stringify(appConfig));
     }
 
     function saveSettings() {
       appConfig.deviceId = document.getElementById('settingDeviceId').value || "DEV-01";
-      appConfig.groupName = document.getElementById('settingGroupName').value || "グループ名";
-
-      localStorage.setItem('cheki_app_config', JSON.stringify(appConfig));
+      localStorage.setItem('cheki_app_config_multi', JSON.stringify(appConfig));
       closeModal('modal-settings');
       generateSerialId();
       updateSettingsUI();
@@ -598,12 +668,12 @@
       hiddenCanvas.width = targetW;
       hiddenCanvas.height = targetH;
 
+      let currentGroup = appConfig.groups[appConfig.selectedGroupIndex] || "グループ";
       let currentIdol = appConfig.idols[appConfig.selectedIndex] || { color: '#ffffff', name: '不明' };
       
-      // メタデータを保持
       const now = new Date();
       currentMetadata = {
-        group: appConfig.groupName,
+        group: currentGroup,
         idol: currentIdol.name,
         serial: cachedSerialId,
         deviceId: appConfig.deviceId,
@@ -653,7 +723,6 @@
       if (rawSnapshotBlobUrl) {
         const autoLink = document.createElement('a');
         autoLink.href = rawSnapshotBlobUrl;
-        // ファイル名にグループ名とメンバー名を含める例
         autoLink.download = `${currentMetadata.group}_${currentMetadata.idol}_raw_${cachedSerialId}.jpg`;
         document.body.appendChild(autoLink);
         autoLink.click();
@@ -771,17 +840,14 @@
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        // デコ済み画像ファイル名にもグループ名・メンバー名を付与
         link.download = `${currentMetadata.group}_${currentMetadata.idol}_deco_${cachedSerialId}.jpg`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
 
         document.getElementById('savedResultImage').src = url;
-        
-        // メタデータ情報をモーダル内に表示（Cloudinary等のアップロード連携用イメージ）
         document.getElementById('metaInfoBox').innerHTML = `
-          <b>【送信・保存データ構造】</b><br>
+          <b>【Cloudinary等への送信データ構造例】</b><br>
           ・グループ: ${currentMetadata.group}<br>
           ・メンバー: ${currentMetadata.idol}<br>
           ・シリアルID: ${currentMetadata.serial}<br>
