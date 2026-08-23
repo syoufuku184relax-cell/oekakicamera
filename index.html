@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>特典会チェキアプリ（プレビュー＆簡単設定対応）</title>
+  <title>特典会チェキアプリ（URLパラメータ連携対応）</title>
   <style>
     /* 画面のスクロールや引っ張り更新を完全に防止 */
     html, body {
@@ -31,7 +31,6 @@
       justify-content: center;
     }
     
-    /* 共通ビュー・プレビュー画像サイズ */
     .viewfinder-container, .preview-container {
       position: relative;
       display: flex;
@@ -47,7 +46,6 @@
       border-radius: 8px;
     }
 
-    /* 描画キャンバス */
     #chekiCanvas {
       width: 95vw;
       max-height: 82vh;
@@ -64,7 +62,6 @@
     .btn-sub { background: #555; color: white; padding: 10px 18px; }
     .btn-retry { background: #b52b27; color: white; padding: 12px 24px; font-size: 15px; }
 
-    /* 画面上部の横並びツールバー */
     .top-toolbar {
       position: absolute;
       top: 8px;
@@ -90,7 +87,6 @@
       box-shadow: 0 2px 6px rgba(0,0,0,0.5);
     }
 
-    /* ポップアップモーダル */
     .modal-overlay {
       position: fixed;
       top: 0; left: 0; width: 100vw; height: 100vh;
@@ -133,7 +129,6 @@
     }
     .pop-btn { background: #444; border: 1px solid #666; }
 
-    /* 設定画面スタイル */
     .setting-group { margin-bottom: 10px; text-align: left; font-size: 13px; }
     .setting-group label { display: block; margin-bottom: 3px; color: #aaa; }
     .setting-group input, .setting-group select {
@@ -245,7 +240,7 @@
     </div>
   </div>
 
-  <!-- 設定変更モーダル（簡易メンバー追加機能付き） -->
+  <!-- 設定変更モーダル -->
   <div id="modal-settings" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-settings')">
     <div class="modal-content">
       <div class="modal-title">アプリ設定 ＆ メンバー管理</div>
@@ -264,7 +259,6 @@
         <div id="idolListContainer" style="max-height: 100px; overflow-y: auto; border: 1px solid #444; border-radius: 6px; padding: 4px; background:#181818;"></div>
       </div>
 
-      <!-- 簡易メンバー追加フォーム -->
       <div style="background: #2a2a2a; padding: 8px; border-radius: 8px; border: 1px dashed #666; margin-bottom: 10px;">
         <label style="font-size: 12px; color: #ff4081; font-weight: bold; margin-bottom: 4px; display:block;">➕ メンバーを簡単追加</label>
         <div style="display: flex; gap: 6px; margin-bottom: 6px;">
@@ -284,22 +278,50 @@
   </div>
 
   <script>
-    // --- 設定データ管理 ---
+    // --- 設定データ管理（URLパラメータ ＆ localStorage両対応） ---
     let appConfig = {
       deviceId: "DEV-A",
       groupName: "推しグループ",
       idols: [
         { name: "メンバーA", color: "#ff69b4" },
-        { name: "メンバーB", color: "#007aff" },
-        { name: "メンバーC", color: "#ffcc00" }
+        { name: "メンバーB", color: "#007aff" }
       ],
       selectedIndex: 0
     };
 
     function loadSettings() {
-      const saved = localStorage.getItem('cheki_settings');
-      if (saved) {
-        try { appConfig = JSON.parse(saved); } catch(e) {}
+      // 1. URLパラメータに設定データ（?config=...）が含まれているか最優先で確認
+      const urlParams = new URLSearchParams(window.location.search);
+      const configParam = urlParams.get('config');
+      
+      if (configParam) {
+        try {
+          // Base64またはURLエンコードされたJSONを復元
+          const decoded = JSON.parse(decodeURIComponent(escape(atob(configParam))));
+          if (decoded && decoded.deviceId) {
+            appConfig = decoded;
+            // 次回以降のためにこのカメラアプリのlocalStorageにも保存する
+            localStorage.setItem('cheki_settings', JSON.stringify(appConfig));
+            // URLパラメータを綺麗に消去（再読み込み時にごちゃつかないようにする）
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+        } catch (e) {
+          // Base64デコード失敗時のフォールバック（生のJSON文字列などの場合）
+          try {
+            const decodedRaw = JSON.parse(configParam);
+            if (decodedRaw && decodedRaw.deviceId) {
+              appConfig = decodedRaw;
+              localStorage.setItem('cheki_settings', JSON.stringify(appConfig));
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
+          } catch(err) {}
+        }
+      } else {
+        // 2. URLにない場合は既存のlocalStorageから読み込み
+        const saved = localStorage.getItem('cheki_settings');
+        if (saved) {
+          try { appConfig = JSON.parse(saved); } catch(e) {}
+        }
       }
       updateSettingsUI();
     }
@@ -308,7 +330,6 @@
       document.getElementById('settingDeviceId').value = appConfig.deviceId || "DEV-A";
       document.getElementById('settingGroupName').value = appConfig.groupName || "";
       
-      // 登録メンバーリスト描画
       const container = document.getElementById('idolListContainer');
       container.innerHTML = '';
       appConfig.idols.forEach((idol, idx) => {
@@ -324,7 +345,6 @@
         container.appendChild(row);
       });
 
-      // セレクトボックス更新
       const select = document.getElementById('settingSelectIdol');
       select.innerHTML = '';
       appConfig.idols.forEach((idol, idx) => {
@@ -351,7 +371,6 @@
       appConfig.idols.push({ name: name, color: colorInput.value });
       nameInput.value = '';
       updateSettingsUI();
-      // 即座にストレージ保存
       localStorage.setItem('cheki_settings', JSON.stringify(appConfig));
     }
 
@@ -446,7 +465,6 @@
       return `${appConfig.deviceId}-${dateStr}-${randStr}`;
     }
 
-    // シャッターボタン → チェキ合成してプレビュー表示
     function takeSnapshot() {
       const hiddenCanvas = document.getElementById('hiddenCanvas');
       const hCtx = hiddenCanvas.getContext('2d');
@@ -491,16 +509,13 @@
         
         document.getElementById('previewImageElement').src = rawSnapshotBlobUrl;
         
-        // カメラ停止
         if (mediaStream) {
           mediaStream.getTracks().forEach(track => track.stop());
         }
-        // プレビュー画面へ移動
         switchScreen('screen-preview');
       }, 'image/jpeg', 0.9);
     }
 
-    // プレビューから「落書きへ」進む
     function proceedToDraw() {
       canvas.width = 600;
       canvas.height = 800;
@@ -517,7 +532,6 @@
       img.src = rawSnapshotBlobUrl;
     }
 
-    // --- ポップアップ・ツール制御 ---
     function openModal(modalId) { document.getElementById(modalId).classList.add('active'); }
     function closeModal(modalId) { document.getElementById(modalId).classList.remove('active'); }
     function closeModalOnBg(e, modalId) { if (e.target.id === modalId) closeModal(modalId); }
@@ -527,7 +541,6 @@
     function selectStamp(stampText) { selectedStamp = stampText; closeModal('modal-stamp'); }
     function cancelStamp() { selectedStamp = null; closeModal('modal-stamp'); }
 
-    // --- 描画イベント ---
     function initDrawingEvents() {
       canvas.onmousedown = handleCanvasDown;
       canvas.onmousemove = handleCanvasMove;
@@ -608,12 +621,9 @@
       }
     }
 
-    // --- 保存処理 ＆ 画像確認ポップアップ ---
     function saveCheki() {
       canvas.toBlob(function(blob) {
         const url = URL.createObjectURL(blob);
-        
-        // ローカルダウンロード
         const link = document.createElement('a');
         link.href = url;
         link.download = `cheki_${appConfig.deviceId}_${Date.now()}.jpg`;
@@ -621,13 +631,11 @@
         link.click();
         document.body.removeChild(link);
 
-        // 保存確認モーダルに画像を表示
         document.getElementById('savedResultImage').src = url;
         openModal('modal-saved');
       }, 'image/jpeg', 0.92);
     }
 
-    // 保存確認モーダルから「次の撮影へ」進むことでカメラフリーズを完全回避して再起動
     function finishAndResetCamera() {
       closeModal('modal-saved');
       startCamera();
