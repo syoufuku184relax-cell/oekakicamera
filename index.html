@@ -3,83 +3,97 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>特典会チェキアプリ（全画面・ピンク追加版）</title>
+  <title>特典会チェキアプリ（プロ仕様）</title>
   <style>
-    body { text-align: center; background: #111; color: white; font-family: sans-serif; margin: 0; padding: 0; touch-action: manipulation; overflow: hidden; }
-    .screen { display: none; height: 100vh; box-sizing: border-box; padding: 5px 0; }
-    .screen.active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    /* 画面のスクロールや引っ張り更新を完全に防止 */
+    html, body {
+      width: 100%; height: 100%;
+      margin: 0; padding: 0;
+      overflow: hidden;
+      position: fixed;
+      background: #000;
+      color: white;
+      font-family: sans-serif;
+      touch-action: none; /* タッチ挙動をアプリ風に固定 */
+    }
+
+    .screen {
+      display: none;
+      width: 100vw; height: 100vh;
+      box-sizing: border-box;
+      position: absolute;
+      top: 0; left: 0;
+    }
+    .screen.active {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
     
-    /* チェキ風ファインダー 3:4 比率 */
+    /* 撮影ファインダー */
     .viewfinder-container {
       position: relative;
-      display: inline-block;
-      background: white;
-      padding: 10px 10px 40px 10px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.6);
-      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
     video {
-      width: 80vw;
-      max-width: 340px;
+      width: 90vw;
+      max-width: 420px;
       aspect-ratio: 3 / 4;
       object-fit: cover;
       background: #000;
-      display: block;
+      border-radius: 8px;
     }
 
-    /* スマホ全画面に近いサイズまで限界まで大きく表示 (3:4保持) */
-    #previewImg, #chekiCanvas {
-      width: auto;
-      height: auto;
-      max-width: 92vw;
-      max-height: 85vh;
+    /* 描画画面：スマホ全画面に近い最大サイズ */
+    #chekiCanvas {
+      width: 95vw;
+      max-height: 82vh;
       aspect-ratio: 3 / 4;
-      border-radius: 6px;
+      border-radius: 4px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.8);
       background: white;
       object-fit: contain;
+      touch-action: none;
     }
 
-    button { padding: 8px 16px; font-size: 13px; margin: 3px; cursor: pointer; border: none; border-radius: 20px; font-weight: bold; }
-    .btn-main { background: #ff4081; color: white; }
-    .btn-sub { background: #777; color: white; }
-    .btn-action-row { margin-top: 5px; }
+    button { font-size: 14px; cursor: pointer; border: none; border-radius: 20px; font-weight: bold; }
+    .btn-main { background: #ff4081; color: white; padding: 12px 24px; }
+    .btn-sub { background: #555; color: white; padding: 10px 18px; }
 
-    /* 描画画面コンテナ */
-    #screen-draw { position: relative; }
-
-    /* 左上の縦並びツールバー */
-    .left-toolbar {
+    /* 画面上部の横並びツールバー */
+    .top-toolbar {
       position: absolute;
-      top: 10px;
-      left: 10px;
+      top: 8px;
+      left: 0; width: 100%;
       display: flex;
-      flex-direction: column;
+      justify-content: center;
       gap: 6px;
       z-index: 10;
+      padding: 0 5px;
+      box-sizing: border-box;
     }
     .tool-icon-btn {
-      width: 42px;
-      height: 42px;
+      width: 40px;
+      height: 40px;
       border-radius: 50%;
-      background: rgba(34, 34, 34, 0.85);
+      background: rgba(30, 30, 30, 0.9);
       border: 2px solid white;
       color: white;
-      font-size: 17px;
+      font-size: 16px;
       display: flex;
       align-items: center;
       justify-content: center;
-      cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
-      padding: 0;
-      margin: 0;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.5);
     }
 
     /* 画面中央ポップアップモーダル */
     .modal-overlay {
       position: fixed;
       top: 0; left: 0; width: 100vw; height: 100vh;
-      background: rgba(0, 0, 0, 0.6);
+      background: rgba(0, 0, 0, 0.7);
       display: none;
       align-items: center;
       justify-content: center;
@@ -89,23 +103,22 @@
     .modal-content {
       background: #222;
       border: 2px solid #555;
-      padding: 15px;
-      border-radius: 15px;
-      width: 80%;
-      max-width: 280px;
-      box-shadow: 0 5px 20px rgba(0,0,0,0.8);
+      padding: 18px;
+      border-radius: 16px;
+      width: 82%;
+      max-width: 320px;
+      box-shadow: 0 5px 25px rgba(0,0,0,0.9);
       text-align: center;
+      box-sizing: border-box;
     }
     .modal-title { font-size: 15px; margin-bottom: 12px; font-weight: bold; color: #ff4081; }
 
-    /* ポップアップ内のカラー・太さグリッド */
     .color-grid, .size-grid, .stamp-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       gap: 8px;
-      justify-items: center;
     }
-    .pop-color-btn {
+    .pop-color-btn, .pop-btn {
       width: 100%;
       padding: 10px;
       border-radius: 8px;
@@ -113,77 +126,70 @@
       font-weight: bold;
       cursor: pointer;
       font-size: 14px;
-    }
-    .pop-btn {
-      width: 100%;
-      padding: 10px;
-      background: #444;
       color: white;
-      border: 1px solid #666;
-      border-radius: 8px;
-      font-size: 14px;
-      cursor: pointer;
+    }
+    .pop-btn { background: #444; border: 1px solid #666; }
+
+    /* 設定画面用スタイル */
+    .setting-group { margin-bottom: 12px; text-align: left; font-size: 13px; }
+    .setting-group label { display: block; margin-bottom: 4px; color: #aaa; }
+    .setting-group input, .setting-group select {
+      width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #555; background: #333; color: white; box-sizing: border-box;
     }
   </style>
 </head>
 <body>
 
-  <!-- ================= 画面1: カメラ撮影 ================= -->
+  <!-- ================= 画面1: カメラ撮影（アイドル選択・設定バー付き） ================= -->
   <div id="screen-capture" class="screen active">
-    <div class="viewfinder-container">
+    <div style="position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; align-items: center; z-index: 5;">
+      <div id="currentInfoDisplay" style="font-size: 12px; background: rgba(0,0,0,0.6); padding: 5px 10px; border-radius: 10px; border: 1px solid #555;">
+        読み込み中...
+      </div>
+      <button class="btn-sub" style="padding: 6px 12px; font-size: 12px;" onclick="openModal('modal-settings')">⚙️ 設定</button>
+    </div>
+
+    <div class="viewfinder-container" style="margin-top: 30px;">
       <video id="cameraStream" autoplay playsinline muted></video>
     </div>
-    <div>
+
+    <div style="margin-top: 15px;">
       <button class="btn-main" onclick="takeSnapshot()">シャッター 📸</button>
     </div>
     <canvas id="hiddenCanvas" style="display:none;"></canvas>
   </div>
 
-  <!-- ================= 画面2: プレビュー確認 ================= -->
-  <div id="screen-preview" class="screen">
-    <div style="font-size: 14px; font-weight: bold; margin-bottom: 2px;">👀 プレビュー確認</div>
-    <div>
-      <img id="previewImg" alt="プレビュー">
-    </div>
-    <div class="btn-action-row">
-      <button class="btn-sub" onclick="retakePhoto()">🔄 撮り直す</button>
-      <button class="btn-main" onclick="confirmPhoto()">✨ これでOK（描画へ）</button>
-    </div>
-  </div>
-
-  <!-- ================= 画面3: 描画（デコ）画面 ================= -->
+  <!-- ================= 画面2: 描画（デコ）画面 ================= -->
   <div id="screen-draw" class="screen">
     
-    <!-- 左上の縦並びツールバー -->
-    <div class="left-toolbar">
+    <!-- 上部の横並びツールバー -->
+    <div class="top-toolbar">
       <button class="tool-icon-btn" onclick="openModal('modal-color')" title="色">🎨</button>
       <button class="tool-icon-btn" onclick="openModal('modal-size')" title="太さ">✒️</button>
       <button class="tool-icon-btn" onclick="openModal('modal-stamp')" title="スタンプ">⭐</button>
       <button class="tool-icon-btn" onclick="undoCanvas()" title="戻す">↩️</button>
       <button class="tool-icon-btn" onclick="clearCanvas()" title="クリア" style="background:#b52b27;">🗑️</button>
+      <button class="tool-icon-btn" onclick="saveCheki()" title="保存" style="background:#28a745;">💾</button>
     </div>
 
+    <!-- 描画キャンバス -->
     <canvas id="chekiCanvas"></canvas>
-
-    <div class="btn-action-row">
-      <button class="btn-sub" onclick="retakePhoto()" style="padding: 6px 12px; font-size: 12px;">🔄 最初から</button>
-      <button class="btn-main" onclick="saveCheki()" style="padding: 6px 12px; font-size: 12px;">💾 保存する</button>
-    </div>
   </div>
 
   <!-- ================= 各種ポップアップモーダル ================= -->
-  <!-- 色選択モーダル (黒・赤・青・黄・紫・緑・ピンク・白) -->
+  
+  <!-- 色選択モーダル -->
   <div id="modal-color" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-color')">
     <div class="modal-content">
       <div class="modal-title">ペンの色を選択</div>
       <div class="color-grid">
-        <button class="pop-color-btn" style="background:#000000; color:#fff;" onclick="setPenColor('#000000')">黒</button>
-        <button class="pop-color-btn" style="background:#ff3b30; color:#fff;" onclick="setPenColor('#ff3b30')">赤</button>
-        <button class="pop-color-btn" style="background:#007aff; color:#fff;" onclick="setPenColor('#007aff')">青</button>
+        <button class="pop-color-btn" style="background:#000000;" onclick="setPenColor('#000000')">黒</button>
+        <button class="pop-color-btn" style="background:#ff3b30;" onclick="setPenColor('#ff3b30')">赤</button>
+        <button class="pop-color-btn" style="background:#007aff;" onclick="setPenColor('#007aff')">青</button>
         <button class="pop-color-btn" style="background:#ffcc00; color:#000;" onclick="setPenColor('#ffcc00')">黄</button>
-        <button class="pop-color-btn" style="background:#ff00ff; color:#fff;" onclick="setPenColor('#ff00ff')">紫</button>
-        <button class="pop-color-btn" style="background:#34c759; color:#fff;" onclick="setPenColor('#34c759')">緑</button>
-        <button class="pop-color-btn" style="background:#ff69b4; color:#fff;" onclick="setPenColor('#ff69b4')">ピンク</button>
+        <button class="pop-color-btn" style="background:#ff00ff;" onclick="setPenColor('#ff00ff')">紫</button>
+        <button class="pop-color-btn" style="background:#34c759;" onclick="setPenColor('#34c759')">緑</button>
+        <button class="pop-color-btn" style="background:#ff69b4;" onclick="setPenColor('#ff69b4')">ピンク</button>
         <button class="pop-color-btn" style="background:#ffffff; color:#000;" onclick="setPenColor('#ffffff')">白</button>
       </div>
     </div>
@@ -194,9 +200,9 @@
     <div class="modal-content">
       <div class="modal-title">ペンの太さを選択</div>
       <div class="size-grid" style="grid-template-columns: 1fr;">
-        <button class="pop-btn" onclick="setPenSize(4)">細</button>
-        <button class="pop-btn" onclick="setPenSize(10)">中</button>
-        <button class="pop-btn" onclick="setPenSize(20)">太</button>
+        <button class="pop-btn" onclick="setPenSize(6)">細</button>
+        <button class="pop-btn" onclick="setPenSize(14)">中</button>
+        <button class="pop-btn" onclick="setPenSize(26)">太</button>
       </div>
     </div>
   </div>
@@ -215,16 +221,113 @@
     </div>
   </div>
 
+  <!-- 設定変更モーダル（別PWA連携対応） -->
+  <div id="modal-settings" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-settings')">
+    <div class="modal-content">
+      <div class="modal-title">アプリ設定 (PWA連携)</div>
+      <div class="setting-group">
+        <label>端末ID</label>
+        <input type="text" id="settingDeviceId" placeholder="例: DEV-01">
+      </div>
+      <div class="setting-group">
+        <label>グループ名</label>
+        <input type="text" id="settingGroupName" placeholder="例: サンプルグループ">
+      </div>
+      <div class="setting-group">
+        <label>アイドルリスト (1行に1名: 名前,メンカラコード)</label>
+        <textarea id="settingIdols" rows="4" style="width:100%; background:#333; color:white; border:1px solid #555; border-radius:6px; padding:6px; box-sizing:border-box;" placeholder="推しの子, #ff69b4&#10;推し美, #007aff"></textarea>
+      </div>
+      <div class="setting-group">
+        <label>撮影時に選択するアイドル</label>
+        <select id="settingSelectIdol"></select>
+      </div>
+      <button class="btn-main" style="width:100%; margin-top:10px; padding:10px;" onclick="saveSettings()">設定を保存</button>
+    </div>
+  </div>
+
   <script>
+    // --- 設定データの管理 (別PWAの localStorage 'cheki_settings' と同期) ---
+    let appConfig = {
+      deviceId: "DEV-A",
+      groupName: "推しグループ",
+      idols: [
+        { name: "メンバーA", color: "#ff69b4" },
+        { name: "メンバーB", color: "#007aff" },
+        { name: "メンバーC", color: "#ffcc00" }
+      ],
+      selectedIndex: 0
+    };
+
+    function loadSettings() {
+      const saved = localStorage.getItem('cheki_settings');
+      if (saved) {
+        try {
+          appConfig = JSON.parse(saved);
+        } catch(e) {}
+      }
+      updateSettingsUI();
+    }
+
+    function updateSettingsUI() {
+      document.getElementById('settingDeviceId').value = appConfig.deviceId || "DEV-A";
+      document.getElementById('settingGroupName').value = appConfig.groupName || "";
+      
+      let idolsText = appConfig.idols.map(i => `${i.name}, ${i.color}`).join('\n');
+      document.getElementById('settingIdols').value = idolsText;
+
+      const select = document.getElementById('settingSelectIdol');
+      select.innerHTML = '';
+      appConfig.idols.forEach((idol, idx) => {
+        let opt = document.createElement('option');
+        opt.value = idx;
+        opt.text = `${idol.name} (${appConfig.groupName})`;
+        if(idx === appConfig.selectedIndex) opt.selected = true;
+        select.appendChild(opt);
+      });
+
+      let currentIdol = appConfig.idols[appConfig.selectedIndex] || appConfig.idols[0];
+      document.getElementById('currentInfoDisplay').innerText = `👤 ${currentIdol ? currentIdol.name : '未選択'} [${appConfig.deviceId}]`;
+    }
+
+    function saveSettings() {
+      appConfig.deviceId = document.getElementById('settingDeviceId').value || "DEV-A";
+      appConfig.groupName = document.getElementById('settingGroupName').value || "";
+      
+      let lines = document.getElementById('settingIdols').value.split('\n');
+      let newIdols = [];
+      lines.forEach(line => {
+        let parts = line.split(',');
+        if(parts.length >= 2) {
+          newIdols.push({ name: parts[0].trim(), color: parts[1].trim() });
+        }
+      });
+      if(newIdols.length > 0) appConfig.idols = newIdols;
+
+      appConfig.selectedIndex = parseInt(document.getElementById('settingSelectIdol').value) || 0;
+
+      localStorage.setItem('cheki_settings', JSON.stringify(appConfig));
+      closeModal('modal-settings');
+      updateSettingsUI();
+    }
+
+    // 起動時に設定読み込み
+    loadSettings();
+    document.getElementById('settingSelectIdol').addEventListener('change', (e) => {
+      appConfig.selectedIndex = parseInt(e.target.value);
+      localStorage.setItem('cheki_settings', JSON.stringify(appConfig));
+      updateSettingsUI();
+    });
+
+
+    // --- カメラ・描画のメイン処理 ---
     const video = document.getElementById('cameraStream');
     let mediaStream = null;
-    let capturedBlob = null;
 
     const canvas = document.getElementById('chekiCanvas');
     const ctx = canvas.getContext('2d');
     let isDrawing = false;
     let penColor = '#000000';
-    let penSize = 10;
+    let penSize = 14;
     let selectedStamp = null;
     let history = [];
     let baseImage = null;
@@ -259,19 +362,39 @@
       }
     }
 
+    // 認識番号生成（端末ID + 日付 + ランダム4桁）
+    function generateSerialId() {
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const dateStr = `${yyyy}${mm}${dd}`;
+      
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      let randStr = '';
+      for(let i=0; i<4; i++) {
+        randStr += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return `${appConfig.deviceId}-${dateStr}-${randStr}`;
+    }
+
+    // --- 撮影実行 -> 即描画画面へ ---
     function takeSnapshot() {
       const hiddenCanvas = document.getElementById('hiddenCanvas');
       const hCtx = hiddenCanvas.getContext('2d');
 
       const targetW = 600;
-      const targetH = 800; // 3:4比率
+      const targetH = 800; // 3:4チェキ比率
       hiddenCanvas.width = targetW;
       hiddenCanvas.height = targetH;
 
-      hCtx.fillStyle = '#ffffff';
+      // 選択中のアイドルのメンバーカラーをチェキ枠（背景）に適用
+      let currentIdol = appConfig.idols[appConfig.selectedIndex] || { color: '#ffffff' };
+      hCtx.fillStyle = currentIdol.color;
       hCtx.fillRect(0, 0, targetW, targetH);
 
-      const pX = 35, pY = 35, pW = 530, pH = 707;
+      // チェキ風写真部分（中央に綺麗に配置）
+      const pX = 30, pY = 30, pW = 540, pH = 670;
       const vW = video.videoWidth, vH = video.videoHeight;
       const vAspect = vW / vH, targetAspect = pW / pH;
 
@@ -284,82 +407,54 @@
 
       hCtx.drawImage(video, sx, sy, sW, sH, pX, pY, pW, pH);
 
-      hiddenCanvas.toBlob(function(blob) {
-        capturedBlob = blob;
-        const imageUrl = URL.createObjectURL(blob);
-        document.getElementById('previewImg').src = imageUrl;
+      // 日付 ＆ 重複しない認識番号の自動刻印（下部余白）
+      const now = new Date();
+      const dateText = `${now.getFullYear()}.${now.getMonth()+1}.${now.getDate()}`;
+      const serialText = generateSerialId();
 
-        if (mediaStream) {
-          mediaStream.getTracks().forEach(track => track.stop());
-        }
-        switchScreen('screen-preview');
+      hCtx.fillStyle = '#333333';
+      hCtx.font = 'bold 16px sans-serif';
+      hCtx.textAlign = 'left';
+      hCtx.fillText(dateText, 35, 765);
+      
+      hCtx.textAlign = 'right';
+      hCtx.font = '14px monospace';
+      hCtx.fillText(serialText, 565, 765);
+
+      hiddenCanvas.toBlob(function(blob) {
+        const url = URL.createObjectURL(blob);
+        
+        canvas.width = targetW;
+        canvas.height = targetH;
+
+        const img = new Image();
+        baseImage = img;
+        img.onload = function() {
+          ctx.drawImage(img, 0, 0);
+          history = [];
+          saveHistory();
+          
+          if (mediaStream) {
+            mediaStream.getTracks().forEach(track => track.stop());
+          }
+          switchScreen('screen-draw');
+          initDrawingEvents();
+        };
+        img.src = url;
       }, 'image/jpeg', 0.9);
     }
 
-    function retakePhoto() {
-      capturedBlob = null;
-      startCamera();
-    }
+    // --- ポップアップ制御 ---
+    function openModal(modalId) { document.getElementById(modalId).classList.add('active'); }
+    function closeModal(modalId) { document.getElementById(modalId).classList.remove('active'); }
+    function closeModalOnBg(e, modalId) { if (e.target.id === modalId) closeModal(modalId); }
 
-    function confirmPhoto() {
-      if (!capturedBlob) return;
+    function setPenColor(color) { penColor = color; selectedStamp = null; closeModal('modal-color'); }
+    function setPenSize(size) { penSize = size; closeModal('modal-size'); }
+    function selectStamp(stampText) { selectedStamp = stampText; closeModal('modal-stamp'); }
+    function cancelStamp() { selectedStamp = null; closeModal('modal-stamp'); }
 
-      const downloadLink = document.createElement('a');
-      const url = URL.createObjectURL(capturedBlob);
-      downloadLink.href = url;
-      downloadLink.download = `cheki_original_${Date.now()}.jpg`;
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
-
-      canvas.width = 600;
-      canvas.height = 800;
-
-      const img = new Image();
-      baseImage = img;
-      img.onload = function() {
-        ctx.drawImage(img, 0, 0);
-        history = [];
-        saveHistory();
-        switchScreen('screen-draw');
-        initDrawingEvents();
-      };
-      img.src = url;
-    }
-
-    function openModal(modalId) {
-      document.getElementById(modalId).classList.add('active');
-    }
-    function closeModal(modalId) {
-      document.getElementById(modalId).classList.remove('active');
-    }
-    function closeModalOnBg(e, modalId) {
-      if (e.target.id === modalId) {
-        closeModal(modalId);
-      }
-    }
-
-    function setPenColor(color) {
-      penColor = color;
-      selectedStamp = null;
-      closeModal('modal-color');
-    }
-
-    function setPenSize(size) {
-      penSize = size;
-      closeModal('modal-size');
-    }
-
-    function selectStamp(stampText) {
-      selectedStamp = stampText;
-      closeModal('modal-stamp');
-    }
-
-    function cancelStamp() {
-      selectedStamp = null;
-      closeModal('modal-stamp');
-    }
-
+    // --- 描画イベント ---
     function initDrawingEvents() {
       canvas.onmousedown = handleCanvasDown;
       canvas.onmousemove = handleCanvasMove;
@@ -386,11 +481,11 @@
 
       if (selectedStamp) {
         ctx.save();
-        ctx.font = 'bold 60px sans-serif';
+        ctx.font = 'bold 65px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.shadowColor = 'white';
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 12;
         ctx.fillText(selectedStamp, pos.x, pos.y);
         ctx.restore();
         saveHistory();
@@ -442,16 +537,19 @@
       }
     }
 
+    // --- 保存処理 ＆ 自動で撮影モードへ復帰 ---
     function saveCheki() {
       canvas.toBlob(function(blob) {
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download = `cheki_deco_${Date.now()}.jpg`;
+        link.download = `cheki_${appConfig.deviceId}_${Date.now()}.jpg`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        alert('デコチェキを保存しました！');
-      }, 'image/jpeg', 0.9);
+
+        // 自動的に撮影モードに戻る
+        startCamera();
+      }, 'image/jpeg', 0.92);
     }
 
     window.addEventListener('load', startCamera);
