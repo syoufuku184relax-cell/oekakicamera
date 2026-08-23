@@ -74,14 +74,15 @@
     }
 
     #chekiCanvas {
-      width: 95vw;
-      max-height: 82vh;
+      width: 90vw;
+      max-width: 380px;
       aspect-ratio: 3 / 4;
       border-radius: 4px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.8);
       background: white;
       object-fit: contain;
       touch-action: none;
+      margin-top: 50px; /* ツールバーと被らないよう上部に配置 */
     }
 
     button { font-size: 14px; cursor: pointer; border: none; border-radius: 20px; font-weight: bold; }
@@ -91,7 +92,7 @@
 
     .top-toolbar {
       position: absolute;
-      top: 8px;
+      top: 6px;
       left: 0; width: 100%;
       display: flex;
       justify-content: center;
@@ -101,13 +102,13 @@
       box-sizing: border-box;
     }
     .tool-icon-btn {
-      width: 40px;
-      height: 40px;
+      width: 38px;
+      height: 38px;
       border-radius: 50%;
       background: rgba(30, 30, 30, 0.9);
       border: 2px solid white;
       color: white;
-      font-size: 16px;
+      font-size: 15px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -197,14 +198,12 @@
   <!-- ================= 画面1: カメラ撮影（常時合成プレビュー） ================= -->
   <div id="screen-capture" class="screen active">
     <div style="position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; align-items: center; z-index: 5;">
-      <!-- 左上の情報表示部分をタップしてメンバー切替モーダルを開く -->
       <div id="currentInfoDisplay" onclick="openModal('modal-select-idol')" style="font-size: 12px; background: rgba(0,0,0,0.7); padding: 6px 12px; border-radius: 12px; border: 1px solid #777; cursor: pointer; display: flex; align-items: center; gap: 6px;">
         読み込み中...
       </div>
       <button class="btn-sub" style="padding: 6px 12px; font-size: 12px;" onclick="openModal('modal-settings')">⚙️ 設定</button>
     </div>
 
-    <!-- ライブフレーム付きビューファインダー -->
     <div class="viewfinder-container" style="margin-top: 25px;">
       <div id="liveChekiFrame">
         <video id="cameraStream" autoplay playsinline muted></video>
@@ -223,13 +222,17 @@
 
   <!-- ================= 画面2: プレビュー確認画面 ================= -->
   <div id="screen-preview" class="screen">
-    <div style="font-size: 14px; margin-bottom: 8px; font-weight: bold; color: #ffcc00;">プレビュー確認</div>
+    <div style="font-size: 13px; margin-bottom: 4px; font-weight: bold; color: #ffcc00;">プレビュー確認</div>
     <div class="preview-container">
       <img id="previewImageElement" class="preview-image" alt="プレビュー">
     </div>
-    <div style="display: flex; gap: 15px; margin-top: 15px;">
-      <button class="btn-retry" onclick="backToCamera()">撮り直す 🔄</button>
-      <button class="btn-main" onclick="proceedToDraw()">落書きへ ✍️</button>
+    <!-- プレビュー画面のボタンを分かりやすく整理 -->
+    <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px; width: 88vw; max-width: 400px;">
+      <button class="btn-main" style="background: #28a745; padding: 10px; font-size: 15px;" onclick="saveRawAndProceedToDraw()">💾 未加工を保存して落書きへ ✍️</button>
+      <div style="display: flex; gap: 10px;">
+        <button class="btn-retry" style="flex: 1; padding: 10px;" onclick="backToCamera()">撮り直す 🔄</button>
+        <button class="btn-sub" style="flex: 1; padding: 10px; background: #333;" onclick="proceedToDrawWithoutSavingRaw()">保存せず落書きへ</button>
+      </div>
     </div>
   </div>
 
@@ -248,7 +251,6 @@
 
   <!-- ================= 各種ポップアップモーダル ================= -->
 
-  <!-- メンバー選択ポップアップ（左上タップで表示） -->
   <div id="modal-select-idol" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-select-idol')">
     <div class="modal-content">
       <div class="modal-title">撮影メンバーを選択</div>
@@ -257,7 +259,6 @@
     </div>
   </div>
 
-  <!-- 色選択モーダル（統一パレット） -->
   <div id="modal-color" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-color')">
     <div class="modal-content">
       <div class="modal-title">ペンの色を選択</div>
@@ -266,7 +267,6 @@
     </div>
   </div>
 
-  <!-- 太さ選択モーダル -->
   <div id="modal-size" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-size')">
     <div class="modal-content">
       <div class="modal-title">ペンの太さを選択</div>
@@ -278,7 +278,6 @@
     </div>
   </div>
 
-  <!-- スタンプ選択モーダル -->
   <div id="modal-stamp" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-stamp')">
     <div class="modal-content">
       <div class="modal-title">スタンプを選択</div>
@@ -292,16 +291,14 @@
     </div>
   </div>
 
-  <!-- 完了・保存確認ポップアップ -->
   <div id="modal-saved" class="modal-overlay">
     <div class="modal-content" style="text-align:center;">
-      <div class="modal-title" style="color:#28a745;">💾 保存が完了しました！</div>
+      <div class="modal-title" style="color:#28a745;">💾 デコ済み画像の保存完了！</div>
       <img id="savedResultImage" style="width: 100%; border-radius: 6px; margin: 10px 0; aspect-ratio:3/4; object-fit:contain; background:#000;" alt="保存画像">
       <button class="btn-main" style="width:100%; padding:10px; margin-top:5px;" onclick="finishAndResetCamera()">次の撮影へ 📸</button>
     </div>
   </div>
 
-  <!-- 設定変更モーダル（端末ID・グループ名・メンバー追加管理） -->
   <div id="modal-settings" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-settings')">
     <div class="modal-content">
       <div class="modal-title">アプリ設定 ＆ メンバー管理</div>
@@ -320,7 +317,6 @@
         <div id="idolListContainer" style="max-height: 90px; overflow-y: auto; border: 1px solid #444; border-radius: 6px; padding: 4px; background:#181818;"></div>
       </div>
 
-      <!-- メンバー追加フォーム（メンカラパレット連動） -->
       <div style="background: #2a2a2a; padding: 8px; border-radius: 8px; border: 1px dashed #666; margin-bottom: 10px;">
         <label style="font-size: 12px; color: #ff4081; font-weight: bold; margin-bottom: 4px; display:block;">➕ メンバーを追加</label>
         <input type="text" id="newIdolName" placeholder="メンバー名" style="width:100%; padding:6px; background:#333; color:white; border:1px solid #555; border-radius:4px; font-size:12px; margin-bottom:6px; box-sizing:border-box;">
@@ -337,7 +333,6 @@
   </div>
 
   <script>
-    // --- 11色の指定カラーパレット定義 ---
     const COLOR_PALETTE = [
       { name: "赤", code: "#FF0000" },
       { name: "青", code: "#0000FF" },
@@ -352,7 +347,6 @@
       { name: "黒", code: "#000000" }
     ];
 
-    // 背景色（Hex）が明るいかどうかを判定して文字色を黒か白に自動切り替えする関数
     function getContrastTextColor(hexColor) {
       let c = hexColor.replace('#', '');
       if (c.length === 3) c = c.split('').map(x => x + x).join('');
@@ -363,7 +357,6 @@
       return yiq >= 128 ? '#000000' : '#FFFFFF';
     }
 
-    // --- 設定データ管理 ---
     let appConfig = {
       deviceId: "DEV-01",
       groupName: "推しグループ",
@@ -382,13 +375,12 @@
       if (saved) {
         try { appConfig = JSON.parse(saved); } catch(e) {}
       }
-      generateSerialId(); // 起動時に一度シリアルを決定
+      generateSerialId();
       buildColorPalettes();
       updateSettingsUI();
     }
 
     function buildColorPalettes() {
-      // 1. 設定画面用のカラーパレット生成
       const settingContainer = document.getElementById('settingColorPaletteContainer');
       settingContainer.innerHTML = '';
       COLOR_PALETTE.forEach(item => {
@@ -409,7 +401,6 @@
         settingContainer.appendChild(btn);
       });
 
-      // 2. 描画（お絵描き）画面用のカラーパレット生成
       const drawingContainer = document.getElementById('drawingColorPaletteContainer');
       drawingContainer.innerHTML = '';
       COLOR_PALETTE.forEach(item => {
@@ -433,7 +424,6 @@
       document.getElementById('settingDeviceId').value = appConfig.deviceId || "DEV-01";
       document.getElementById('settingGroupName').value = appConfig.groupName || "";
       
-      // 設定画面のメンバー削除用リスト
       const container = document.getElementById('idolListContainer');
       container.innerHTML = '';
       appConfig.idols.forEach((idol, idx) => {
@@ -449,7 +439,6 @@
         container.appendChild(row);
       });
 
-      // 左上のメンバー選択モーダル内のリストを更新
       const selectModalList = document.getElementById('modalIdolSelectList');
       selectModalList.innerHTML = '';
       appConfig.idols.forEach((idol, idx) => {
@@ -477,7 +466,7 @@
       let currentIdol = appConfig.idols[appConfig.selectedIndex] || appConfig.idols[0];
       document.getElementById('currentInfoDisplay').innerHTML = `
         <span style="width:10px; height:10px; background:${currentIdol ? currentIdol.color : '#fff'}; border-radius:50%; display:inline-block;"></span>
-        <span>${currentIdol ? currentIdol.name : '未選択'} ▾</span>
+        <span>${currentIdol ? currentIdol.name : '未体験'} ▾</span>
       `;
 
       updateLiveFrameStyle();
@@ -536,8 +525,6 @@
 
     loadSettings();
 
-
-    // --- カメラ・プレビュー・描画制御 ---
     const video = document.getElementById('cameraStream');
     let mediaStream = null;
     let rawSnapshotBlobUrl = null;
@@ -608,7 +595,6 @@
       hiddenCanvas.width = targetW;
       hiddenCanvas.height = targetH;
 
-      // 画面上のライブフレームと同じデザイン・配色でキャンバスに描画
       let currentIdol = appConfig.idols[appConfig.selectedIndex] || { color: '#ffffff' };
       hCtx.fillStyle = currentIdol.color;
       hCtx.fillRect(0, 0, targetW, targetH);
@@ -651,7 +637,20 @@
       }, 'image/jpeg', 0.9);
     }
 
-    function proceedToDraw() {
+    // ユーザーの明示的なタップ操作をトリガーにして確実に未加工画像をダウンロード
+    function saveRawAndProceedToDraw() {
+      if (rawSnapshotBlobUrl) {
+        const autoLink = document.createElement('a');
+        autoLink.href = rawSnapshotBlobUrl;
+        autoLink.download = `cheki_raw_${cachedSerialId}.jpg`;
+        document.body.appendChild(autoLink);
+        autoLink.click();
+        document.body.removeChild(autoLink);
+      }
+      proceedToDrawWithoutSavingRaw();
+    }
+
+    function proceedToDrawWithoutSavingRaw() {
       canvas.width = 600;
       canvas.height = 800;
 
@@ -760,7 +759,7 @@
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `cheki_${appConfig.deviceId}_${Date.now()}.jpg`;
+        link.download = `cheki_deco_${cachedSerialId}.jpg`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
