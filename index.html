@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>特典会チェキアプリ（常時フレーム合成版）</title>
+  <title>特典会チェキアプリ（グループ名・データ連携対応版）</title>
   <style>
     /* 画面のスクロールや引っ張り更新を完全に防止 */
     html, body {
@@ -140,7 +140,6 @@
     }
     .modal-title { font-size: 15px; margin-bottom: 12px; font-weight: bold; color: #ff4081; }
 
-    /* カラーパレットのグリッドスタイル */
     .color-palette-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -226,7 +225,6 @@
     <div class="preview-container">
       <img id="previewImageElement" class="preview-image" alt="プレビュー">
     </div>
-    <!-- プレビュー画面のボタンを分かりやすく整理 -->
     <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px; width: 88vw; max-width: 400px;">
       <button class="btn-main" style="background: #28a745; padding: 10px; font-size: 15px;" onclick="saveRawAndProceedToDraw()">💾 未加工を保存して落書きへ ✍️</button>
       <div style="display: flex; gap: 10px;">
@@ -295,13 +293,17 @@
     <div class="modal-content" style="text-align:center;">
       <div class="modal-title" style="color:#28a745;">💾 デコ済み画像の保存完了！</div>
       <img id="savedResultImage" style="width: 100%; border-radius: 6px; margin: 10px 0; aspect-ratio:3/4; object-fit:contain; background:#000;" alt="保存画像">
+      
+      <!-- Cloudinary連携プレースホルダー（将来の拡張用） -->
+      <div id="metaInfoBox" style="font-size:11px; color:#aaa; background:#181818; padding:6px; border-radius:4px; margin-bottom:10px; text-align:left;"></div>
+
       <button class="btn-main" style="width:100%; padding:10px; margin-top:5px;" onclick="finishAndResetCamera()">次の撮影へ 📸</button>
     </div>
   </div>
 
   <div id="modal-settings" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-settings')">
     <div class="modal-content">
-      <div class="modal-title">アプリ設定 ＆ メンバー管理</div>
+      <div class="modal-title">アプリ設定 ＆ グループ管理</div>
       
       <div class="setting-group">
         <label>端末ID</label>
@@ -309,7 +311,7 @@
       </div>
       <div class="setting-group">
         <label>グループ名</label>
-        <input type="text" id="settingGroupName" placeholder="例: サンプルグループ">
+        <input type="text" id="settingGroupName" placeholder="例: 推しグループ名">
       </div>
 
       <div class="setting-group">
@@ -359,7 +361,7 @@
 
     let appConfig = {
       deviceId: "DEV-01",
-      groupName: "推しグループ",
+      groupName: "サンプルグループ",
       idols: [
         { name: "メンバーA", color: "#FF69B4" },
         { name: "メンバーB", color: "#0000FF" }
@@ -369,6 +371,7 @@
 
     let newIdolSelectedColor = "#FF0000";
     let cachedSerialId = "";
+    let currentMetadata = {}; // 撮影時のメタデータ保存用
 
     function loadSettings() {
       const saved = localStorage.getItem('cheki_app_config');
@@ -466,7 +469,7 @@
       let currentIdol = appConfig.idols[appConfig.selectedIndex] || appConfig.idols[0];
       document.getElementById('currentInfoDisplay').innerHTML = `
         <span style="width:10px; height:10px; background:${currentIdol ? currentIdol.color : '#fff'}; border-radius:50%; display:inline-block;"></span>
-        <span>${currentIdol ? currentIdol.name : '未体験'} ▾</span>
+        <span>[${appConfig.groupName}] ${currentIdol ? currentIdol.name : ''} ▾</span>
       `;
 
       updateLiveFrameStyle();
@@ -515,7 +518,7 @@
 
     function saveSettings() {
       appConfig.deviceId = document.getElementById('settingDeviceId').value || "DEV-01";
-      appConfig.groupName = document.getElementById('settingGroupName').value || "";
+      appConfig.groupName = document.getElementById('settingGroupName').value || "グループ名";
 
       localStorage.setItem('cheki_app_config', JSON.stringify(appConfig));
       closeModal('modal-settings');
@@ -595,7 +598,18 @@
       hiddenCanvas.width = targetW;
       hiddenCanvas.height = targetH;
 
-      let currentIdol = appConfig.idols[appConfig.selectedIndex] || { color: '#ffffff' };
+      let currentIdol = appConfig.idols[appConfig.selectedIndex] || { color: '#ffffff', name: '不明' };
+      
+      // メタデータを保持
+      const now = new Date();
+      currentMetadata = {
+        group: appConfig.groupName,
+        idol: currentIdol.name,
+        serial: cachedSerialId,
+        deviceId: appConfig.deviceId,
+        date: `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
+      };
+
       hCtx.fillStyle = currentIdol.color;
       hCtx.fillRect(0, 0, targetW, targetH);
 
@@ -612,9 +626,7 @@
 
       hCtx.drawImage(video, sx, sy, sW, sH, pX, pY, pW, pH);
 
-      const now = new Date();
       const dateText = `${now.getFullYear()}.${now.getMonth()+1}.${now.getDate()}`;
-
       const textColor = getContrastTextColor(currentIdol.color);
       hCtx.fillStyle = textColor;
       hCtx.font = 'bold 16px sans-serif';
@@ -637,12 +649,12 @@
       }, 'image/jpeg', 0.9);
     }
 
-    // ユーザーの明示的なタップ操作をトリガーにして確実に未加工画像をダウンロード
     function saveRawAndProceedToDraw() {
       if (rawSnapshotBlobUrl) {
         const autoLink = document.createElement('a');
         autoLink.href = rawSnapshotBlobUrl;
-        autoLink.download = `cheki_raw_${cachedSerialId}.jpg`;
+        // ファイル名にグループ名とメンバー名を含める例
+        autoLink.download = `${currentMetadata.group}_${currentMetadata.idol}_raw_${cachedSerialId}.jpg`;
         document.body.appendChild(autoLink);
         autoLink.click();
         document.body.removeChild(autoLink);
@@ -759,12 +771,23 @@
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `cheki_deco_${cachedSerialId}.jpg`;
+        // デコ済み画像ファイル名にもグループ名・メンバー名を付与
+        link.download = `${currentMetadata.group}_${currentMetadata.idol}_deco_${cachedSerialId}.jpg`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
 
         document.getElementById('savedResultImage').src = url;
+        
+        // メタデータ情報をモーダル内に表示（Cloudinary等のアップロード連携用イメージ）
+        document.getElementById('metaInfoBox').innerHTML = `
+          <b>【送信・保存データ構造】</b><br>
+          ・グループ: ${currentMetadata.group}<br>
+          ・メンバー: ${currentMetadata.idol}<br>
+          ・シリアルID: ${currentMetadata.serial}<br>
+          ・撮影日付: ${currentMetadata.date}
+        `;
+
         openModal('modal-saved');
       }, 'image/jpeg', 0.92);
     }
