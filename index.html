@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>特典会チェキアプリ（プロ仕様）</title>
+  <title>特典会チェキアプリ（プレビュー＆簡単設定対応）</title>
   <style>
     /* 画面のスクロールや引っ張り更新を完全に防止 */
     html, body {
@@ -14,7 +14,7 @@
       background: #000;
       color: white;
       font-family: sans-serif;
-      touch-action: none; /* タッチ挙動をアプリ風に固定 */
+      touch-action: none;
     }
 
     .screen {
@@ -31,23 +31,23 @@
       justify-content: center;
     }
     
-    /* 撮影ファインダー */
-    .viewfinder-container {
+    /* 共通ビュー・プレビュー画像サイズ */
+    .viewfinder-container, .preview-container {
       position: relative;
       display: flex;
       flex-direction: column;
       align-items: center;
     }
-    video {
-      width: 90vw;
-      max-width: 420px;
+    video, .preview-image {
+      width: 88vw;
+      max-width: 400px;
       aspect-ratio: 3 / 4;
       object-fit: cover;
       background: #000;
       border-radius: 8px;
     }
 
-    /* 描画画面：スマホ全画面に近い最大サイズ */
+    /* 描画キャンバス */
     #chekiCanvas {
       width: 95vw;
       max-height: 82vh;
@@ -60,8 +60,9 @@
     }
 
     button { font-size: 14px; cursor: pointer; border: none; border-radius: 20px; font-weight: bold; }
-    .btn-main { background: #ff4081; color: white; padding: 12px 24px; }
+    .btn-main { background: #ff4081; color: white; padding: 12px 28px; font-size: 16px; }
     .btn-sub { background: #555; color: white; padding: 10px 18px; }
+    .btn-retry { background: #b52b27; color: white; padding: 12px 24px; font-size: 15px; }
 
     /* 画面上部の横並びツールバー */
     .top-toolbar {
@@ -89,11 +90,11 @@
       box-shadow: 0 2px 6px rgba(0,0,0,0.5);
     }
 
-    /* 画面中央ポップアップモーダル */
+    /* ポップアップモーダル */
     .modal-overlay {
       position: fixed;
       top: 0; left: 0; width: 100vw; height: 100vh;
-      background: rgba(0, 0, 0, 0.7);
+      background: rgba(0, 0, 0, 0.75);
       display: none;
       align-items: center;
       justify-content: center;
@@ -103,13 +104,15 @@
     .modal-content {
       background: #222;
       border: 2px solid #555;
-      padding: 18px;
+      padding: 16px;
       border-radius: 16px;
-      width: 82%;
-      max-width: 320px;
+      width: 86%;
+      max-width: 340px;
       box-shadow: 0 5px 25px rgba(0,0,0,0.9);
       text-align: center;
       box-sizing: border-box;
+      max-height: 90vh;
+      overflow-y: auto;
     }
     .modal-title { font-size: 15px; margin-bottom: 12px; font-weight: bold; color: #ff4081; }
 
@@ -130,17 +133,21 @@
     }
     .pop-btn { background: #444; border: 1px solid #666; }
 
-    /* 設定画面用スタイル */
-    .setting-group { margin-bottom: 12px; text-align: left; font-size: 13px; }
-    .setting-group label { display: block; margin-bottom: 4px; color: #aaa; }
+    /* 設定画面スタイル */
+    .setting-group { margin-bottom: 10px; text-align: left; font-size: 13px; }
+    .setting-group label { display: block; margin-bottom: 3px; color: #aaa; }
     .setting-group input, .setting-group select {
       width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #555; background: #333; color: white; box-sizing: border-box;
+    }
+    .idol-item-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: #2a2a2a; padding: 6px 10px; border-radius: 6px; margin-bottom: 4px; font-size: 13px;
     }
   </style>
 </head>
 <body>
 
-  <!-- ================= 画面1: カメラ撮影（アイドル選択・設定バー付き） ================= -->
+  <!-- ================= 画面1: カメラ撮影 ================= -->
   <div id="screen-capture" class="screen active">
     <div style="position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; align-items: center; z-index: 5;">
       <div id="currentInfoDisplay" style="font-size: 12px; background: rgba(0,0,0,0.6); padding: 5px 10px; border-radius: 10px; border: 1px solid #555;">
@@ -149,7 +156,7 @@
       <button class="btn-sub" style="padding: 6px 12px; font-size: 12px;" onclick="openModal('modal-settings')">⚙️ 設定</button>
     </div>
 
-    <div class="viewfinder-container" style="margin-top: 30px;">
+    <div class="viewfinder-container" style="margin-top: 25px;">
       <video id="cameraStream" autoplay playsinline muted></video>
     </div>
 
@@ -159,10 +166,20 @@
     <canvas id="hiddenCanvas" style="display:none;"></canvas>
   </div>
 
-  <!-- ================= 画面2: 描画（デコ）画面 ================= -->
+  <!-- ================= 画面2: プレビュー確認画面 ================= -->
+  <div id="screen-preview" class="screen">
+    <div style="font-size: 14px; margin-bottom: 8px; font-weight: bold; color: #ffcc00;">プレビュー確認</div>
+    <div class="preview-container">
+      <img id="previewImageElement" class="preview-image" alt="プレビュー">
+    </div>
+    <div style="display: flex; gap: 15px; margin-top: 15px;">
+      <button class="btn-retry" onclick="backToCamera()">撮り直す 🔄</button>
+      <button class="btn-main" onclick="proceedToDraw()">落書きへ ✍️</button>
+    </div>
+  </div>
+
+  <!-- ================= 画面3: 描画（デコ）画面 ================= -->
   <div id="screen-draw" class="screen">
-    
-    <!-- 上部の横並びツールバー -->
     <div class="top-toolbar">
       <button class="tool-icon-btn" onclick="openModal('modal-color')" title="色">🎨</button>
       <button class="tool-icon-btn" onclick="openModal('modal-size')" title="太さ">✒️</button>
@@ -171,13 +188,11 @@
       <button class="tool-icon-btn" onclick="clearCanvas()" title="クリア" style="background:#b52b27;">🗑️</button>
       <button class="tool-icon-btn" onclick="saveCheki()" title="保存" style="background:#28a745;">💾</button>
     </div>
-
-    <!-- 描画キャンバス -->
     <canvas id="chekiCanvas"></canvas>
   </div>
 
   <!-- ================= 各種ポップアップモーダル ================= -->
-  
+
   <!-- 色選択モーダル -->
   <div id="modal-color" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-color')">
     <div class="modal-content">
@@ -217,14 +232,24 @@
         <button class="pop-btn" style="font-size:24px;" onclick="selectStamp('💖')">💖</button>
         <button class="pop-btn" style="font-size:18px;" onclick="selectStamp('推し')">推し</button>
       </div>
-      <button class="pop-btn" style="margin-top:12px; background:#444;" onclick="cancelStamp()">ペンモードに戻る</button>
+      <button class="pop-btn" style="margin-top:10px; background:#444;" onclick="cancelStamp()">ペンモードに戻る</button>
     </div>
   </div>
 
-  <!-- 設定変更モーダル（別PWA連携対応） -->
+  <!-- 完了・保存確認ポップアップ -->
+  <div id="modal-saved" class="modal-overlay">
+    <div class="modal-content" style="text-align:center;">
+      <div class="modal-title" style="color:#28a745;">💾 保存が完了しました！</div>
+      <img id="savedResultImage" style="width: 100%; border-radius: 6px; margin: 10px 0; aspect-ratio:3/4; object-fit:contain; background:#000;" alt="保存画像">
+      <button class="btn-main" style="width:100%; padding:10px; margin-top:5px;" onclick="finishAndResetCamera()">次の撮影へ 📸</button>
+    </div>
+  </div>
+
+  <!-- 設定変更モーダル（簡易メンバー追加機能付き） -->
   <div id="modal-settings" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-settings')">
     <div class="modal-content">
-      <div class="modal-title">アプリ設定 (PWA連携)</div>
+      <div class="modal-title">アプリ設定 ＆ メンバー管理</div>
+      
       <div class="setting-group">
         <label>端末ID</label>
         <input type="text" id="settingDeviceId" placeholder="例: DEV-01">
@@ -233,20 +258,33 @@
         <label>グループ名</label>
         <input type="text" id="settingGroupName" placeholder="例: サンプルグループ">
       </div>
+
       <div class="setting-group">
-        <label>アイドルリスト (1行に1名: 名前,メンカラコード)</label>
-        <textarea id="settingIdols" rows="4" style="width:100%; background:#333; color:white; border:1px solid #555; border-radius:6px; padding:6px; box-sizing:border-box;" placeholder="推しの子, #ff69b4&#10;推し美, #007aff"></textarea>
+        <label>現在登録されているメンバー</label>
+        <div id="idolListContainer" style="max-height: 100px; overflow-y: auto; border: 1px solid #444; border-radius: 6px; padding: 4px; background:#181818;"></div>
       </div>
+
+      <!-- 簡易メンバー追加フォーム -->
+      <div style="background: #2a2a2a; padding: 8px; border-radius: 8px; border: 1px dashed #666; margin-bottom: 10px;">
+        <label style="font-size: 12px; color: #ff4081; font-weight: bold; margin-bottom: 4px; display:block;">➕ メンバーを簡単追加</label>
+        <div style="display: flex; gap: 6px; margin-bottom: 6px;">
+          <input type="text" id="newIdolName" placeholder="メンバー名" style="flex: 2; padding: 6px; background:#333; color:white; border:1px solid #555; border-radius:4px; font-size:12px;">
+          <input type="color" id="newIdolColor" value="#ff69b4" style="width: 35px; height: 32px; border: none; background: none; cursor: pointer;">
+        </div>
+        <button class="pop-btn" style="width: 100%; background: #449d44; padding: 6px; font-size: 12px;" onclick="addNewIdolSimple()">このメンバーを追加する</button>
+      </div>
+
       <div class="setting-group">
         <label>撮影時に選択するアイドル</label>
         <select id="settingSelectIdol"></select>
       </div>
-      <button class="btn-main" style="width:100%; margin-top:10px; padding:10px;" onclick="saveSettings()">設定を保存</button>
+
+      <button class="btn-main" style="width:100%; margin-top:5px; padding:10px;" onclick="saveSettings()">設定を保存して閉じる</button>
     </div>
   </div>
 
   <script>
-    // --- 設定データの管理 (別PWAの localStorage 'cheki_settings' と同期) ---
+    // --- 設定データ管理 ---
     let appConfig = {
       deviceId: "DEV-A",
       groupName: "推しグループ",
@@ -261,9 +299,7 @@
     function loadSettings() {
       const saved = localStorage.getItem('cheki_settings');
       if (saved) {
-        try {
-          appConfig = JSON.parse(saved);
-        } catch(e) {}
+        try { appConfig = JSON.parse(saved); } catch(e) {}
       }
       updateSettingsUI();
     }
@@ -272,9 +308,23 @@
       document.getElementById('settingDeviceId').value = appConfig.deviceId || "DEV-A";
       document.getElementById('settingGroupName').value = appConfig.groupName || "";
       
-      let idolsText = appConfig.idols.map(i => `${i.name}, ${i.color}`).join('\n');
-      document.getElementById('settingIdols').value = idolsText;
+      // 登録メンバーリスト描画
+      const container = document.getElementById('idolListContainer');
+      container.innerHTML = '';
+      appConfig.idols.forEach((idol, idx) => {
+        let row = document.createElement('div');
+        row.className = 'idol-item-row';
+        row.innerHTML = `
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="width:12px; height:12px; background:${idol.color}; border-radius:50%; display:inline-block;"></span>
+            <span>${idol.name}</span>
+          </div>
+          <button style="background:#b52b27; color:white; border:none; padding:2px 6px; border-radius:4px; font-size:11px;" onclick="removeIdol(${idx})">削除</button>
+        `;
+        container.appendChild(row);
+      });
 
+      // セレクトボックス更新
       const select = document.getElementById('settingSelectIdol');
       select.innerHTML = '';
       appConfig.idols.forEach((idol, idx) => {
@@ -289,20 +339,38 @@
       document.getElementById('currentInfoDisplay').innerText = `👤 ${currentIdol ? currentIdol.name : '未選択'} [${appConfig.deviceId}]`;
     }
 
+    function addNewIdolSimple() {
+      const nameInput = document.getElementById('newIdolName');
+      const colorInput = document.getElementById('newIdolColor');
+      const name = nameInput.value.trim();
+      
+      if(!name) {
+        alert('メンバー名を入力してください。');
+        return;
+      }
+      appConfig.idols.push({ name: name, color: colorInput.value });
+      nameInput.value = '';
+      updateSettingsUI();
+      // 即座にストレージ保存
+      localStorage.setItem('cheki_settings', JSON.stringify(appConfig));
+    }
+
+    function removeIdol(idx) {
+      if(appConfig.idols.length <= 1) {
+        alert('最低1人のメンバーが必要です。');
+        return;
+      }
+      appConfig.idols.splice(idx, 1);
+      if(appConfig.selectedIndex >= appConfig.idols.length) {
+        appConfig.selectedIndex = appConfig.idols.length - 1;
+      }
+      updateSettingsUI();
+      localStorage.setItem('cheki_settings', JSON.stringify(appConfig));
+    }
+
     function saveSettings() {
       appConfig.deviceId = document.getElementById('settingDeviceId').value || "DEV-A";
       appConfig.groupName = document.getElementById('settingGroupName').value || "";
-      
-      let lines = document.getElementById('settingIdols').value.split('\n');
-      let newIdols = [];
-      lines.forEach(line => {
-        let parts = line.split(',');
-        if(parts.length >= 2) {
-          newIdols.push({ name: parts[0].trim(), color: parts[1].trim() });
-        }
-      });
-      if(newIdols.length > 0) appConfig.idols = newIdols;
-
       appConfig.selectedIndex = parseInt(document.getElementById('settingSelectIdol').value) || 0;
 
       localStorage.setItem('cheki_settings', JSON.stringify(appConfig));
@@ -310,7 +378,6 @@
       updateSettingsUI();
     }
 
-    // 起動時に設定読み込み
     loadSettings();
     document.getElementById('settingSelectIdol').addEventListener('change', (e) => {
       appConfig.selectedIndex = parseInt(e.target.value);
@@ -319,9 +386,10 @@
     });
 
 
-    // --- カメラ・描画のメイン処理 ---
+    // --- カメラ・プレビュー・描画制御 ---
     const video = document.getElementById('cameraStream');
     let mediaStream = null;
+    let rawSnapshotBlobUrl = null;
 
     const canvas = document.getElementById('chekiCanvas');
     const ctx = canvas.getContext('2d');
@@ -340,6 +408,9 @@
     async function startCamera() {
       switchScreen('screen-capture');
       try {
+        if (mediaStream) {
+          mediaStream.getTracks().forEach(track => track.stop());
+        }
         mediaStream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'environment', width: { ideal: 1080 }, height: { ideal: 1440 } },
           audio: false
@@ -362,38 +433,33 @@
       }
     }
 
-    // 認識番号生成（端末ID + 日付 + ランダム4桁）
+    function backToCamera() {
+      startCamera();
+    }
+
     function generateSerialId() {
       const now = new Date();
-      const yyyy = now.getFullYear();
-      const mm = String(now.getMonth() + 1).padStart(2, '0');
-      const dd = String(now.getDate()).padStart(2, '0');
-      const dateStr = `${yyyy}${mm}${dd}`;
-      
+      const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
       const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
       let randStr = '';
-      for(let i=0; i<4; i++) {
-        randStr += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
+      for(let i=0; i<4; i++) randStr += chars.charAt(Math.floor(Math.random() * chars.length));
       return `${appConfig.deviceId}-${dateStr}-${randStr}`;
     }
 
-    // --- 撮影実行 -> 即描画画面へ ---
+    // シャッターボタン → チェキ合成してプレビュー表示
     function takeSnapshot() {
       const hiddenCanvas = document.getElementById('hiddenCanvas');
       const hCtx = hiddenCanvas.getContext('2d');
 
       const targetW = 600;
-      const targetH = 800; // 3:4チェキ比率
+      const targetH = 800;
       hiddenCanvas.width = targetW;
       hiddenCanvas.height = targetH;
 
-      // 選択中のアイドルのメンバーカラーをチェキ枠（背景）に適用
       let currentIdol = appConfig.idols[appConfig.selectedIndex] || { color: '#ffffff' };
       hCtx.fillStyle = currentIdol.color;
       hCtx.fillRect(0, 0, targetW, targetH);
 
-      // チェキ風写真部分（中央に綺麗に配置）
       const pX = 30, pY = 30, pW = 540, pH = 670;
       const vW = video.videoWidth, vH = video.videoHeight;
       const vAspect = vW / vH, targetAspect = pW / pH;
@@ -407,7 +473,6 @@
 
       hCtx.drawImage(video, sx, sy, sW, sH, pX, pY, pW, pH);
 
-      // 日付 ＆ 重複しない認識番号の自動刻印（下部余白）
       const now = new Date();
       const dateText = `${now.getFullYear()}.${now.getMonth()+1}.${now.getDate()}`;
       const serialText = generateSerialId();
@@ -416,35 +481,43 @@
       hCtx.font = 'bold 16px sans-serif';
       hCtx.textAlign = 'left';
       hCtx.fillText(dateText, 35, 765);
-      
       hCtx.textAlign = 'right';
       hCtx.font = '14px monospace';
       hCtx.fillText(serialText, 565, 765);
 
       hiddenCanvas.toBlob(function(blob) {
-        const url = URL.createObjectURL(blob);
+        if(rawSnapshotBlobUrl) URL.revokeObjectURL(rawSnapshotBlobUrl);
+        rawSnapshotBlobUrl = URL.createObjectURL(blob);
         
-        canvas.width = targetW;
-        canvas.height = targetH;
-
-        const img = new Image();
-        baseImage = img;
-        img.onload = function() {
-          ctx.drawImage(img, 0, 0);
-          history = [];
-          saveHistory();
-          
-          if (mediaStream) {
-            mediaStream.getTracks().forEach(track => track.stop());
-          }
-          switchScreen('screen-draw');
-          initDrawingEvents();
-        };
-        img.src = url;
+        document.getElementById('previewImageElement').src = rawSnapshotBlobUrl;
+        
+        // カメラ停止
+        if (mediaStream) {
+          mediaStream.getTracks().forEach(track => track.stop());
+        }
+        // プレビュー画面へ移動
+        switchScreen('screen-preview');
       }, 'image/jpeg', 0.9);
     }
 
-    // --- ポップアップ制御 ---
+    // プレビューから「落書きへ」進む
+    function proceedToDraw() {
+      canvas.width = 600;
+      canvas.height = 800;
+
+      const img = new Image();
+      baseImage = img;
+      img.onload = function() {
+        ctx.drawImage(img, 0, 0);
+        history = [];
+        saveHistory();
+        switchScreen('screen-draw');
+        initDrawingEvents();
+      };
+      img.src = rawSnapshotBlobUrl;
+    }
+
+    // --- ポップアップ・ツール制御 ---
     function openModal(modalId) { document.getElementById(modalId).classList.add('active'); }
     function closeModal(modalId) { document.getElementById(modalId).classList.remove('active'); }
     function closeModalOnBg(e, modalId) { if (e.target.id === modalId) closeModal(modalId); }
@@ -478,7 +551,6 @@
 
     function handleCanvasDown(e) {
       const pos = getMousePos(e);
-
       if (selectedStamp) {
         ctx.save();
         ctx.font = 'bold 65px sans-serif';
@@ -522,8 +594,7 @@
     function undoCanvas() {
       if (history.length > 1) {
         history.pop();
-        const prev = history[history.length - 1];
-        ctx.putImageData(prev, 0, 0);
+        ctx.putImageData(history[history.length - 1], 0, 0);
       }
     }
 
@@ -537,19 +608,29 @@
       }
     }
 
-    // --- 保存処理 ＆ 自動で撮影モードへ復帰 ---
+    // --- 保存処理 ＆ 画像確認ポップアップ ---
     function saveCheki() {
       canvas.toBlob(function(blob) {
+        const url = URL.createObjectURL(blob);
+        
+        // ローカルダウンロード
         const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
+        link.href = url;
         link.download = `cheki_${appConfig.deviceId}_${Date.now()}.jpg`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
 
-        // 自動的に撮影モードに戻る
-        startCamera();
+        // 保存確認モーダルに画像を表示
+        document.getElementById('savedResultImage').src = url;
+        openModal('modal-saved');
       }, 'image/jpeg', 0.92);
+    }
+
+    // 保存確認モーダルから「次の撮影へ」進むことでカメラフリーズを完全回避して再起動
+    function finishAndResetCamera() {
+      closeModal('modal-saved');
+      startCamera();
     }
 
     window.addEventListener('load', startCamera);
