@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>特典会チェキアプリ（複数グループ・フラッシュ・ズーム対応版）</title>
+  <title>特典会チェキアプリ（ファイル名自動振り分け版）</title>
   <style>
     /* 画面のスクロールや引っ張り更新を完全に防止 */
     html, body {
@@ -120,7 +120,6 @@
       border-color: #ffcc00;
     }
 
-    /* ズームスライダー等のコントロール群をファインダー下に配置 */
     .camera-controls {
       width: 88vw;
       max-width: 400px;
@@ -218,7 +217,7 @@
 </head>
 <body>
 
-  <!-- ================= 画面1: カメラ撮影（常時合成プレビュー & フラッシュ・ズーム対応） ================= -->
+  <!-- ================= 画面1: カメラ撮影 ================= -->
   <div id="screen-capture" class="screen active">
     <div style="position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; align-items: center; z-index: 5;">
       <div id="currentInfoDisplay" onclick="openModal('modal-select-target')" style="font-size: 12px; background: rgba(0,0,0,0.7); padding: 6px 12px; border-radius: 12px; border: 1px solid #777; cursor: pointer; display: flex; align-items: center; gap: 6px;">
@@ -232,11 +231,10 @@
         <video id="cameraStream" autoplay playsinline muted></video>
         <div class="live-footer">
           <span id="liveDateText" style="font-size: 13px;">2026.6.6</span>
-          <span id="liveSerialText" style="font-size: 12px; font-family: monospace;">DEV-01-XXXX</span>
+          <span id="liveSerialText" style="font-size: 12px; font-family: monospace; background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 4px;">DEV-01-XXXX</span>
         </div>
       </div>
 
-      <!-- ズームとフラッシュのコントロールバー -->
       <div class="camera-controls">
         <button id="torchBtn" class="tool-icon-btn" style="width:34px; height:34px; font-size:14px;" onclick="toggleTorch()" title="フラッシュライト">⚡</button>
         <span style="font-size:11px;">🔍 ズーム</span>
@@ -274,14 +272,13 @@
       <button class="tool-icon-btn" onclick="openModal('modal-stamp')" title="スタンプ">⭐</button>
       <button class="tool-icon-btn" onclick="undoCanvas()" title="戻す">↩️</button>
       <button class="tool-icon-btn" onclick="clearCanvas()" title="クリア" style="background:#b52b27;">🗑️</button>
-      <button class="tool-icon-btn" onclick="saveCheki()" title="保存" style="background:#28a745;">💾</button>
+      <button class="tool-icon-btn" onclick="saveCheki()" title="保存・プリント準備" style="background:#28a745;">💾</button>
     </div>
     <canvas id="chekiCanvas"></canvas>
   </div>
 
   <!-- ================= 各種ポップアップモーダル ================= -->
 
-  <!-- グループ・メンバー選択モーダル -->
   <div id="modal-select-target" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-select-target')">
     <div class="modal-content">
       <div class="modal-title">グループ & メンバー選択</div>
@@ -330,14 +327,13 @@
 
   <div id="modal-saved" class="modal-overlay">
     <div class="modal-content" style="text-align:center;">
-      <div class="modal-title" style="color:#28a745;">💾 保存完了！</div>
+      <div class="modal-title" style="color:#28a745;">💾 保存・プリント準備完了！</div>
       <img id="savedResultImage" style="width: 100%; border-radius: 6px; margin: 10px 0; aspect-ratio:3/4; object-fit:contain; background:#000;" alt="保存画像">
-      <div id="metaInfoBox" style="font-size:11px; color:#aaa; background:#181818; padding:6px; border-radius:4px; margin-bottom:10px; text-align:left;"></div>
+      <div id="metaInfoBox" style="font-size:12px; color:#fff; background:#181818; padding:8px; border-radius:4px; margin-bottom:10px; text-align:left; border: 1px solid #444;"></div>
       <button class="btn-main" style="width:100%; padding:10px; margin-top:5px;" onclick="finishAndResetCamera()">次の撮影へ 📸</button>
     </div>
   </div>
 
-  <!-- 設定モーダル（複数グループ・メンバー管理） -->
   <div id="modal-settings" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-settings')">
     <div class="modal-content">
       <div class="modal-title">アプリ設定 ＆ グループ管理</div>
@@ -347,7 +343,6 @@
         <input type="text" id="settingDeviceId" placeholder="例: DEV-01">
       </div>
 
-      <!-- グループ一覧と追加 -->
       <div class="setting-group">
         <label>登録グループ一覧</label>
         <div id="groupListContainer" style="max-height: 80px; overflow-y: auto; border: 1px solid #444; border-radius: 6px; padding: 4px; background:#181818; margin-bottom:4px;"></div>
@@ -357,7 +352,6 @@
         </div>
       </div>
 
-      <!-- メンバー一覧と追加 -->
       <div class="setting-group">
         <label>登録メンバー一覧</label>
         <div id="idolListContainer" style="max-height: 90px; overflow-y: auto; border: 1px solid #444; border-radius: 6px; padding: 4px; background:#181818; margin-bottom:4px;"></div>
@@ -560,7 +554,6 @@
 
       const textColor = getContrastTextColor(currentIdol.color);
       document.getElementById('liveDateText').style.color = textColor;
-      document.getElementById('liveSerialText').style.color = textColor;
 
       const now = new Date();
       document.getElementById('liveDateText').innerText = `${now.getFullYear()}.${now.getMonth()+1}.${now.getDate()}`;
@@ -649,7 +642,6 @@
         video.srcObject = mediaStream;
         videoTrack = mediaStream.getVideoTracks()[0];
 
-        // ズーム機能の初期設定
         const capabilities = videoTrack.getCapabilities();
         const zoomSlider = document.getElementById('zoomSlider');
         if (capabilities.zoom) {
@@ -683,20 +675,17 @@
       }
     }
 
-    // ズーム変更処理
     async function changeZoom(val) {
       document.getElementById('zoomValueText').innerText = Number(val).toFixed(1) + 'x';
       if (!videoTrack) return;
       try {
         await videoTrack.applyConstraints({ advanced: [{ zoom: parseFloat(val) }] });
       } catch (e) {
-        // デバイスが対応していない場合のフォールバック（CSS拡大）
         video.style.transform = `scale(${val})`;
         video.style.transformOrigin = 'center center';
       }
     }
 
-    // フラッシュ（トーチ）切り替え処理
     async function toggleTorch() {
       if (!videoTrack) return;
       const capabilities = videoTrack.getCapabilities();
@@ -770,13 +759,28 @@
 
       const dateText = `${now.getFullYear()}.${now.getMonth()+1}.${now.getDate()}`;
       const textColor = getContrastTextColor(currentIdol.color);
+      
       hCtx.fillStyle = textColor;
-      hCtx.font = 'bold 16px sans-serif';
+      hCtx.font = 'bold 18px sans-serif';
       hCtx.textAlign = 'left';
-      hCtx.fillText(dateText, 35, 765);
+      hCtx.fillText(dateText, 35, 762);
+
+      // シリアル番号描画（画面上には綺麗な認識番号がそのまま大きく表示される）
+      hCtx.font = 'bold 20px monospace';
+      const serialMetrics = hCtx.measureText(cachedSerialId);
+      const textPaddingX = 10;
+      const textPaddingY = 6;
+      const bgBoxWidth = serialMetrics.width + (textPaddingX * 2);
+      const bgBoxHeight = 28;
+      const bgBoxX = 565 - bgBoxWidth;
+      const bgBoxY = 740;
+
+      hCtx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+      hCtx.fillRect(bgBoxX, bgBoxY, bgBoxWidth, bgBoxHeight);
+
+      hCtx.fillStyle = '#FFFFFF';
       hCtx.textAlign = 'right';
-      hCtx.font = '14px monospace';
-      hCtx.fillText(cachedSerialId, 565, 765);
+      hCtx.fillText(cachedSerialId, 565 - textPaddingX, bgBoxY + 20);
 
       hiddenCanvas.toBlob(function(blob) {
         if(rawSnapshotBlobUrl) URL.revokeObjectURL(rawSnapshotBlobUrl);
@@ -795,6 +799,7 @@
       if (rawSnapshotBlobUrl) {
         const autoLink = document.createElement('a');
         autoLink.href = rawSnapshotBlobUrl;
+        // ★ここで自動的に「_raw」を裏で付与して保存します
         autoLink.download = `${currentMetadata.group}_${currentMetadata.idol}_raw_${cachedSerialId}.jpg`;
         document.body.appendChild(autoLink);
         autoLink.click();
@@ -912,6 +917,7 @@
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
+        // ★ここで自動的に「_deco」を裏で付与して保存します
         link.download = `${currentMetadata.group}_${currentMetadata.idol}_deco_${cachedSerialId}.jpg`;
         document.body.appendChild(link);
         link.click();
@@ -919,11 +925,11 @@
 
         document.getElementById('savedResultImage').src = url;
         document.getElementById('metaInfoBox').innerHTML = `
-          <b>【Cloudinary等への送信データ構造例】</b><br>
-          ・グループ: ${currentMetadata.group}<br>
-          ・メンバー: ${currentMetadata.idol}<br>
-          ・シリアルID: ${currentMetadata.serial}<br>
-          ・撮影日付: ${currentMetadata.date}
+          <b style="color:#ff4081; font-size:13px;">【スタッフ確認用情報】</b><br>
+          📁 グループ: <b>${currentMetadata.group}</b><br>
+          👤 メンバー: <b style="color:#ffcc00; font-size:14px;">${currentMetadata.idol}</b><br>
+          🔢 シリアルID: <b style="font-family:monospace; font-size:14px; background:#333; padding:2px 4px;">${currentMetadata.serial}</b><br>
+          📅 撮影日付: ${currentMetadata.date}
         `;
 
         openModal('modal-saved');
