@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>特典会チェキアプリ（URLパラメータ連携対応）</title>
+  <title>特典会チェキアプリ（単体設定＆統一カラーパレット版）</title>
   <style>
     /* 画面のスクロールや引っ張り更新を完全に防止 */
     html, body {
@@ -102,8 +102,8 @@
       border: 2px solid #555;
       padding: 16px;
       border-radius: 16px;
-      width: 86%;
-      max-width: 340px;
+      width: 90%;
+      max-width: 360px;
       box-shadow: 0 5px 25px rgba(0,0,0,0.9);
       text-align: center;
       box-sizing: border-box;
@@ -112,24 +112,44 @@
     }
     .modal-title { font-size: 15px; margin-bottom: 12px; font-weight: bold; color: #ff4081; }
 
-    .color-grid, .size-grid, .stamp-grid {
+    /* カラーパレットのグリッドスタイル */
+    .color-palette-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .palette-btn {
+      padding: 10px 4px;
+      border-radius: 8px;
+      border: 2px solid rgba(255,255,255,0.6);
+      font-weight: bold;
+      font-size: 12px;
+      cursor: pointer;
+      text-align: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      transition: transform 0.1s;
+    }
+    .palette-btn:active { transform: scale(0.95); }
+
+    .size-grid, .stamp-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       gap: 8px;
     }
-    .pop-color-btn, .pop-btn {
+    .pop-btn {
       width: 100%;
       padding: 10px;
       border-radius: 8px;
-      border: 2px solid white;
+      border: 1px solid #666;
+      background: #444;
       font-weight: bold;
       cursor: pointer;
       font-size: 14px;
       color: white;
     }
-    .pop-btn { background: #444; border: 1px solid #666; }
 
-    .setting-group { margin-bottom: 10px; text-align: left; font-size: 13px; }
+    .setting-group { margin-bottom: 12px; text-align: left; font-size: 13px; }
     .setting-group label { display: block; margin-bottom: 3px; color: #aaa; }
     .setting-group input, .setting-group select {
       width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #555; background: #333; color: white; box-sizing: border-box;
@@ -188,20 +208,12 @@
 
   <!-- ================= 各種ポップアップモーダル ================= -->
 
-  <!-- 色選択モーダル -->
+  <!-- 色選択モーダル（統一パレット） -->
   <div id="modal-color" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-color')">
     <div class="modal-content">
       <div class="modal-title">ペンの色を選択</div>
-      <div class="color-grid">
-        <button class="pop-color-btn" style="background:#000000;" onclick="setPenColor('#000000')">黒</button>
-        <button class="pop-color-btn" style="background:#ff3b30;" onclick="setPenColor('#ff3b30')">赤</button>
-        <button class="pop-color-btn" style="background:#007aff;" onclick="setPenColor('#007aff')">青</button>
-        <button class="pop-color-btn" style="background:#ffcc00; color:#000;" onclick="setPenColor('#ffcc00')">黄</button>
-        <button class="pop-color-btn" style="background:#ff00ff;" onclick="setPenColor('#ff00ff')">紫</button>
-        <button class="pop-color-btn" style="background:#34c759;" onclick="setPenColor('#34c759')">緑</button>
-        <button class="pop-color-btn" style="background:#ff69b4;" onclick="setPenColor('#ff69b4')">ピンク</button>
-        <button class="pop-color-btn" style="background:#ffffff; color:#000;" onclick="setPenColor('#ffffff')">白</button>
-      </div>
+      <div id="drawingColorPaletteContainer" class="color-palette-grid"></div>
+      <button class="pop-btn" style="margin-top:8px; background:#444;" onclick="closeModal('modal-color')">閉じる</button>
     </div>
   </div>
 
@@ -240,7 +252,7 @@
     </div>
   </div>
 
-  <!-- 設定変更モーダル -->
+  <!-- 設定変更モーダル（完全単体設定＆メンバー管理） -->
   <div id="modal-settings" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-settings')">
     <div class="modal-content">
       <div class="modal-title">アプリ設定 ＆ メンバー管理</div>
@@ -256,16 +268,19 @@
 
       <div class="setting-group">
         <label>現在登録されているメンバー</label>
-        <div id="idolListContainer" style="max-height: 100px; overflow-y: auto; border: 1px solid #444; border-radius: 6px; padding: 4px; background:#181818;"></div>
+        <div id="idolListContainer" style="max-height: 90px; overflow-y: auto; border: 1px solid #444; border-radius: 6px; padding: 4px; background:#181818;"></div>
       </div>
 
+      <!-- メンバー追加フォーム（メンカラパレット連動） -->
       <div style="background: #2a2a2a; padding: 8px; border-radius: 8px; border: 1px dashed #666; margin-bottom: 10px;">
-        <label style="font-size: 12px; color: #ff4081; font-weight: bold; margin-bottom: 4px; display:block;">➕ メンバーを簡単追加</label>
-        <div style="display: flex; gap: 6px; margin-bottom: 6px;">
-          <input type="text" id="newIdolName" placeholder="メンバー名" style="flex: 2; padding: 6px; background:#333; color:white; border:1px solid #555; border-radius:4px; font-size:12px;">
-          <input type="color" id="newIdolColor" value="#ff69b4" style="width: 35px; height: 32px; border: none; background: none; cursor: pointer;">
-        </div>
-        <button class="pop-btn" style="width: 100%; background: #449d44; padding: 6px; font-size: 12px;" onclick="addNewIdolSimple()">このメンバーを追加する</button>
+        <label style="font-size: 12px; color: #ff4081; font-weight: bold; margin-bottom: 4px; display:block;">➕ メンバーを追加</label>
+        <input type="text" id="newIdolName" placeholder="メンバー名" style="width:100%; padding:6px; background:#333; color:white; border:1px solid #555; border-radius:4px; font-size:12px; margin-bottom:6px; box-sizing:border-box;">
+        
+        <label style="font-size: 11px; color: #aaa; margin-bottom: 2px; display:block;">メンカラを選択:</label>
+        <div id="settingColorPaletteContainer" class="color-palette-grid" style="margin-bottom:6px;"></div>
+        
+        <div id="selectedColorPreview" style="font-size: 11px; margin-bottom: 6px; color: #ffcc00;">選択中カラー: 赤</div>
+        <button class="pop-btn" style="width: 100%; background: #449d44; padding: 6px; font-size: 12px;" onclick="addNewIdol()">リストに追加する</button>
       </div>
 
       <div class="setting-group">
@@ -278,56 +293,100 @@
   </div>
 
   <script>
-    // --- 設定データ管理（URLパラメータ ＆ localStorage両対応） ---
+    // --- 11色の指定カラーパレット定義 ---
+    const COLOR_PALETTE = [
+      { name: "赤", code: "#FF0000" },
+      { name: "青", code: "#0000FF" },
+      { name: "黄", code: "#FFFF00" },
+      { name: "紫", code: "#ff00ff" },
+      { name: "ピンク", code: "#FF69B4" },
+      { name: "緑", code: "#008000" },
+      { name: "パステルブルー", code: "#ADD8E6" },
+      { name: "オレンジ", code: "#FFA500" },
+      { name: "エメラルド", code: "#50C878" },
+      { name: "白", code: "#FFFFFF" },
+      { name: "黒", code: "#000000" }
+    ];
+
+    // 背景色（Hex）が明るいかどうかを判定して文字色を黒か白に自動切り替えする関数
+    function getContrastTextColor(hexColor) {
+      let c = hexColor.replace('#', '');
+      if (c.length === 3) c = c.split('').map(x => x + x).join('');
+      const r = parseInt(c.substr(0, 2), 16);
+      const g = parseInt(c.substr(2, 2), 16);
+      const b = parseInt(c.substr(4, 2), 16);
+      // 輝度計算
+      const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+      return yiq >= 128 ? '#000000' : '#FFFFFF';
+    }
+
+    // --- 設定データ管理 ---
     let appConfig = {
-      deviceId: "DEV-A",
+      deviceId: "DEV-01",
       groupName: "推しグループ",
       idols: [
-        { name: "メンバーA", color: "#ff69b4" },
-        { name: "メンバーB", color: "#007aff" }
+        { name: "メンバーA", color: "#FF69B4" },
+        { name: "メンバーB", color: "#0000FF" }
       ],
       selectedIndex: 0
     };
 
+    let newIdolSelectedColor = "#FF0000"; // 新規追加時に選択中のメンカラ
+
     function loadSettings() {
-      // 1. URLパラメータに設定データ（?config=...）が含まれているか最優先で確認
-      const urlParams = new URLSearchParams(window.location.search);
-      const configParam = urlParams.get('config');
-      
-      if (configParam) {
-        try {
-          // Base64またはURLエンコードされたJSONを復元
-          const decoded = JSON.parse(decodeURIComponent(escape(atob(configParam))));
-          if (decoded && decoded.deviceId) {
-            appConfig = decoded;
-            // 次回以降のためにこのカメラアプリのlocalStorageにも保存する
-            localStorage.setItem('cheki_settings', JSON.stringify(appConfig));
-            // URLパラメータを綺麗に消去（再読み込み時にごちゃつかないようにする）
-            window.history.replaceState({}, document.title, window.location.pathname);
-          }
-        } catch (e) {
-          // Base64デコード失敗時のフォールバック（生のJSON文字列などの場合）
-          try {
-            const decodedRaw = JSON.parse(configParam);
-            if (decodedRaw && decodedRaw.deviceId) {
-              appConfig = decodedRaw;
-              localStorage.setItem('cheki_settings', JSON.stringify(appConfig));
-              window.history.replaceState({}, document.title, window.location.pathname);
-            }
-          } catch(err) {}
-        }
-      } else {
-        // 2. URLにない場合は既存のlocalStorageから読み込み
-        const saved = localStorage.getItem('cheki_settings');
-        if (saved) {
-          try { appConfig = JSON.parse(saved); } catch(e) {}
-        }
+      const saved = localStorage.getItem('cheki_app_config');
+      if (saved) {
+        try { appConfig = JSON.parse(saved); } catch(e) {}
       }
+      buildColorPalettes();
       updateSettingsUI();
     }
 
+    // 設定画面と描画画面にカラーパレットを自動生成
+    function buildColorPalettes() {
+      // 1. 設定画面用のカラーパレット生成
+      const settingContainer = document.getElementById('settingColorPaletteContainer');
+      settingContainer.innerHTML = '';
+      COLOR_PALETTE.forEach(item => {
+        let btn = document.createElement('button');
+        btn.className = 'palette-btn';
+        btn.style.backgroundColor = item.code;
+        btn.style.color = getContrastTextColor(item.code);
+        btn.innerText = item.name;
+        if(item.code === newIdolSelectedColor) {
+          btn.style.border = '2px solid #ff4081';
+          btn.style.transform = 'scale(1.03)';
+        }
+        btn.onclick = () => {
+          newIdolSelectedColor = item.code;
+          document.getElementById('selectedColorPreview').innerText = `選択中カラー: ${item.name}`;
+          buildColorPalettes(); // 選択枠の見た目を更新
+        };
+        settingContainer.appendChild(btn);
+      });
+
+      // 2. 描画（お絵描き）画面用のカラーパレット生成
+      const drawingContainer = document.getElementById('drawingColorPaletteContainer');
+      drawingContainer.innerHTML = '';
+      COLOR_PALETTE.forEach(item => {
+        let btn = document.createElement('button');
+        btn.className = 'palette-btn';
+        btn.style.backgroundColor = item.code;
+        btn.style.color = getContrastTextColor(item.code);
+        btn.style.padding = '14px 4px';
+        btn.style.fontSize = '13px';
+        btn.innerText = item.name;
+        btn.onclick = () => {
+          penColor = item.code;
+          selectedStamp = null;
+          closeModal('modal-color');
+        };
+        drawingContainer.appendChild(btn);
+      });
+    }
+
     function updateSettingsUI() {
-      document.getElementById('settingDeviceId').value = appConfig.deviceId || "DEV-A";
+      document.getElementById('settingDeviceId').value = appConfig.deviceId || "DEV-01";
       document.getElementById('settingGroupName').value = appConfig.groupName || "";
       
       const container = document.getElementById('idolListContainer');
@@ -337,7 +396,7 @@
         row.className = 'idol-item-row';
         row.innerHTML = `
           <div style="display:flex; align-items:center; gap:6px;">
-            <span style="width:12px; height:12px; background:${idol.color}; border-radius:50%; display:inline-block;"></span>
+            <span style="width:14px; height:14px; background:${idol.color}; border:1px solid #fff; border-radius:50%; display:inline-block;"></span>
             <span>${idol.name}</span>
           </div>
           <button style="background:#b52b27; color:white; border:none; padding:2px 6px; border-radius:4px; font-size:11px;" onclick="removeIdol(${idx})">削除</button>
@@ -359,19 +418,18 @@
       document.getElementById('currentInfoDisplay').innerText = `👤 ${currentIdol ? currentIdol.name : '未選択'} [${appConfig.deviceId}]`;
     }
 
-    function addNewIdolSimple() {
+    function addNewIdol() {
       const nameInput = document.getElementById('newIdolName');
-      const colorInput = document.getElementById('newIdolColor');
       const name = nameInput.value.trim();
       
       if(!name) {
         alert('メンバー名を入力してください。');
         return;
       }
-      appConfig.idols.push({ name: name, color: colorInput.value });
+      appConfig.idols.push({ name: name, color: newIdolSelectedColor });
       nameInput.value = '';
       updateSettingsUI();
-      localStorage.setItem('cheki_settings', JSON.stringify(appConfig));
+      localStorage.setItem('cheki_app_config', JSON.stringify(appConfig));
     }
 
     function removeIdol(idx) {
@@ -384,15 +442,15 @@
         appConfig.selectedIndex = appConfig.idols.length - 1;
       }
       updateSettingsUI();
-      localStorage.setItem('cheki_settings', JSON.stringify(appConfig));
+      localStorage.setItem('cheki_app_config', JSON.stringify(appConfig));
     }
 
     function saveSettings() {
-      appConfig.deviceId = document.getElementById('settingDeviceId').value || "DEV-A";
+      appConfig.deviceId = document.getElementById('settingDeviceId').value || "DEV-01";
       appConfig.groupName = document.getElementById('settingGroupName').value || "";
       appConfig.selectedIndex = parseInt(document.getElementById('settingSelectIdol').value) || 0;
 
-      localStorage.setItem('cheki_settings', JSON.stringify(appConfig));
+      localStorage.setItem('cheki_app_config', JSON.stringify(appConfig));
       closeModal('modal-settings');
       updateSettingsUI();
     }
@@ -400,7 +458,7 @@
     loadSettings();
     document.getElementById('settingSelectIdol').addEventListener('change', (e) => {
       appConfig.selectedIndex = parseInt(e.target.value);
-      localStorage.setItem('cheki_settings', JSON.stringify(appConfig));
+      localStorage.setItem('cheki_app_config', JSON.stringify(appConfig));
       updateSettingsUI();
     });
 
@@ -413,7 +471,7 @@
     const canvas = document.getElementById('chekiCanvas');
     const ctx = canvas.getContext('2d');
     let isDrawing = false;
-    let penColor = '#000000';
+    let penColor = '#FF0000';
     let penSize = 14;
     let selectedStamp = null;
     let history = [];
@@ -536,7 +594,6 @@
     function closeModal(modalId) { document.getElementById(modalId).classList.remove('active'); }
     function closeModalOnBg(e, modalId) { if (e.target.id === modalId) closeModal(modalId); }
 
-    function setPenColor(color) { penColor = color; selectedStamp = null; closeModal('modal-color'); }
     function setPenSize(size) { penSize = size; closeModal('modal-size'); }
     function selectStamp(stampText) { selectedStamp = stampText; closeModal('modal-stamp'); }
     function cancelStamp() { selectedStamp = null; closeModal('modal-stamp'); }
