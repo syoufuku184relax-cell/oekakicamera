@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>特典会チェキアプリ（単体設定＆統一カラーパレット版）</title>
+  <title>特典会チェキアプリ（常時フレーム合成版）</title>
   <style>
     /* 画面のスクロールや引っ張り更新を完全に防止 */
     html, body {
@@ -37,13 +37,40 @@
       flex-direction: column;
       align-items: center;
     }
-    video, .preview-image {
+    
+    /* ライブ合成用のチェキ風コンテナ */
+    #liveChekiFrame {
       width: 88vw;
       max-width: 400px;
       aspect-ratio: 3 / 4;
+      border-radius: 8px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 20px 20px 10px 20px;
+      box-sizing: border-box;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+    }
+    
+    video, .preview-image {
+      width: 100%;
+      aspect-ratio: 540 / 670; /* 内部のカメラ映像比率 */
       object-fit: cover;
       background: #000;
-      border-radius: 8px;
+      border-radius: 4px;
+    }
+
+    .live-footer {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: auto;
+      padding-top: 4px;
+      font-weight: bold;
     }
 
     #chekiCanvas {
@@ -151,28 +178,41 @@
 
     .setting-group { margin-bottom: 12px; text-align: left; font-size: 13px; }
     .setting-group label { display: block; margin-bottom: 3px; color: #aaa; }
-    .setting-group input, .setting-group select {
+    .setting-group input {
       width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #555; background: #333; color: white; box-sizing: border-box;
     }
     .idol-item-row {
       display: flex; align-items: center; justify-content: space-between;
       background: #2a2a2a; padding: 6px 10px; border-radius: 6px; margin-bottom: 4px; font-size: 13px;
     }
+    .select-idol-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: #333; padding: 10px 12px; border-radius: 8px; margin-bottom: 6px; cursor: pointer; border: 1px solid #555;
+    }
+    .select-idol-row:active { background: #444; }
   </style>
 </head>
 <body>
 
-  <!-- ================= 画面1: カメラ撮影 ================= -->
+  <!-- ================= 画面1: カメラ撮影（常時合成プレビュー） ================= -->
   <div id="screen-capture" class="screen active">
     <div style="position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; align-items: center; z-index: 5;">
-      <div id="currentInfoDisplay" style="font-size: 12px; background: rgba(0,0,0,0.6); padding: 5px 10px; border-radius: 10px; border: 1px solid #555;">
+      <!-- 左上の情報表示部分をタップしてメンバー切替モーダルを開く -->
+      <div id="currentInfoDisplay" onclick="openModal('modal-select-idol')" style="font-size: 12px; background: rgba(0,0,0,0.7); padding: 6px 12px; border-radius: 12px; border: 1px solid #777; cursor: pointer; display: flex; align-items: center; gap: 6px;">
         読み込み中...
       </div>
       <button class="btn-sub" style="padding: 6px 12px; font-size: 12px;" onclick="openModal('modal-settings')">⚙️ 設定</button>
     </div>
 
+    <!-- ライブフレーム付きビューファインダー -->
     <div class="viewfinder-container" style="margin-top: 25px;">
-      <video id="cameraStream" autoplay playsinline muted></video>
+      <div id="liveChekiFrame">
+        <video id="cameraStream" autoplay playsinline muted></video>
+        <div class="live-footer">
+          <span id="liveDateText" style="font-size: 13px;">2026.6.6</span>
+          <span id="liveSerialText" style="font-size: 12px; font-family: monospace;">DEV-01-XXXX</span>
+        </div>
+      </div>
     </div>
 
     <div style="margin-top: 15px;">
@@ -207,6 +247,15 @@
   </div>
 
   <!-- ================= 各種ポップアップモーダル ================= -->
+
+  <!-- メンバー選択ポップアップ（左上タップで表示） -->
+  <div id="modal-select-idol" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-select-idol')">
+    <div class="modal-content">
+      <div class="modal-title">撮影メンバーを選択</div>
+      <div id="modalIdolSelectList" style="max-height: 250px; overflow-y: auto; margin-bottom: 10px;"></div>
+      <button class="pop-btn" style="background:#444;" onclick="closeModal('modal-select-idol')">閉じる</button>
+    </div>
+  </div>
 
   <!-- 色選択モーダル（統一パレット） -->
   <div id="modal-color" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-color')">
@@ -252,7 +301,7 @@
     </div>
   </div>
 
-  <!-- 設定変更モーダル（完全単体設定＆メンバー管理） -->
+  <!-- 設定変更モーダル（端末ID・グループ名・メンバー追加管理） -->
   <div id="modal-settings" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-settings')">
     <div class="modal-content">
       <div class="modal-title">アプリ設定 ＆ メンバー管理</div>
@@ -267,7 +316,7 @@
       </div>
 
       <div class="setting-group">
-        <label>現在登録されているメンバー</label>
+        <label>登録メンバー一覧</label>
         <div id="idolListContainer" style="max-height: 90px; overflow-y: auto; border: 1px solid #444; border-radius: 6px; padding: 4px; background:#181818;"></div>
       </div>
 
@@ -281,11 +330,6 @@
         
         <div id="selectedColorPreview" style="font-size: 11px; margin-bottom: 6px; color: #ffcc00;">選択中カラー: 赤</div>
         <button class="pop-btn" style="width: 100%; background: #449d44; padding: 6px; font-size: 12px;" onclick="addNewIdol()">リストに追加する</button>
-      </div>
-
-      <div class="setting-group">
-        <label>撮影時に選択するアイドル</label>
-        <select id="settingSelectIdol"></select>
       </div>
 
       <button class="btn-main" style="width:100%; margin-top:5px; padding:10px;" onclick="saveSettings()">設定を保存して閉じる</button>
@@ -315,7 +359,6 @@
       const r = parseInt(c.substr(0, 2), 16);
       const g = parseInt(c.substr(2, 2), 16);
       const b = parseInt(c.substr(4, 2), 16);
-      // 輝度計算
       const yiq = (r * 299 + g * 587 + b * 114) / 1000;
       return yiq >= 128 ? '#000000' : '#FFFFFF';
     }
@@ -331,18 +374,19 @@
       selectedIndex: 0
     };
 
-    let newIdolSelectedColor = "#FF0000"; // 新規追加時に選択中のメンカラ
+    let newIdolSelectedColor = "#FF0000";
+    let cachedSerialId = "";
 
     function loadSettings() {
       const saved = localStorage.getItem('cheki_app_config');
       if (saved) {
         try { appConfig = JSON.parse(saved); } catch(e) {}
       }
+      generateSerialId(); // 起動時に一度シリアルを決定
       buildColorPalettes();
       updateSettingsUI();
     }
 
-    // 設定画面と描画画面にカラーパレットを自動生成
     function buildColorPalettes() {
       // 1. 設定画面用のカラーパレット生成
       const settingContainer = document.getElementById('settingColorPaletteContainer');
@@ -360,7 +404,7 @@
         btn.onclick = () => {
           newIdolSelectedColor = item.code;
           document.getElementById('selectedColorPreview').innerText = `選択中カラー: ${item.name}`;
-          buildColorPalettes(); // 選択枠の見た目を更新
+          buildColorPalettes();
         };
         settingContainer.appendChild(btn);
       });
@@ -389,6 +433,7 @@
       document.getElementById('settingDeviceId').value = appConfig.deviceId || "DEV-01";
       document.getElementById('settingGroupName').value = appConfig.groupName || "";
       
+      // 設定画面のメンバー削除用リスト
       const container = document.getElementById('idolListContainer');
       container.innerHTML = '';
       appConfig.idols.forEach((idol, idx) => {
@@ -404,18 +449,52 @@
         container.appendChild(row);
       });
 
-      const select = document.getElementById('settingSelectIdol');
-      select.innerHTML = '';
+      // 左上のメンバー選択モーダル内のリストを更新
+      const selectModalList = document.getElementById('modalIdolSelectList');
+      selectModalList.innerHTML = '';
       appConfig.idols.forEach((idol, idx) => {
-        let opt = document.createElement('option');
-        opt.value = idx;
-        opt.text = `${idol.name} (${appConfig.groupName})`;
-        if(idx === appConfig.selectedIndex) opt.selected = true;
-        select.appendChild(opt);
+        let row = document.createElement('div');
+        row.className = 'select-idol-row';
+        let isSelected = (idx === appConfig.selectedIndex);
+        row.style.border = isSelected ? '2px solid #ff4081' : '1px solid #555';
+        row.innerHTML = `
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="width:16px; height:16px; background:${idol.color}; border:1px solid #fff; border-radius:50%; display:inline-block;"></span>
+            <span style="font-weight:bold; font-size:14px;">${idol.name}</span>
+          </div>
+          <span style="font-size:12px; color:${isSelected ? '#ff4081' : '#aaa'};">${isSelected ? '選択中 ✓' : '選択'}</span>
+        `;
+        row.onclick = () => {
+          appConfig.selectedIndex = idx;
+          localStorage.setItem('cheki_app_config', JSON.stringify(appConfig));
+          updateSettingsUI();
+          updateLiveFrameStyle();
+          closeModal('modal-select-idol');
+        };
+        selectModalList.appendChild(row);
       });
 
       let currentIdol = appConfig.idols[appConfig.selectedIndex] || appConfig.idols[0];
-      document.getElementById('currentInfoDisplay').innerText = `👤 ${currentIdol ? currentIdol.name : '未選択'} [${appConfig.deviceId}]`;
+      document.getElementById('currentInfoDisplay').innerHTML = `
+        <span style="width:10px; height:10px; background:${currentIdol ? currentIdol.color : '#fff'}; border-radius:50%; display:inline-block;"></span>
+        <span>${currentIdol ? currentIdol.name : '未選択'} ▾</span>
+      `;
+
+      updateLiveFrameStyle();
+    }
+
+    function updateLiveFrameStyle() {
+      let currentIdol = appConfig.idols[appConfig.selectedIndex] || { color: '#ffffff' };
+      const frame = document.getElementById('liveChekiFrame');
+      frame.style.backgroundColor = currentIdol.color;
+
+      const textColor = getContrastTextColor(currentIdol.color);
+      document.getElementById('liveDateText').style.color = textColor;
+      document.getElementById('liveSerialText').style.color = textColor;
+
+      const now = new Date();
+      document.getElementById('liveDateText').innerText = `${now.getFullYear()}.${now.getMonth()+1}.${now.getDate()}`;
+      document.getElementById('liveSerialText').innerText = cachedSerialId;
     }
 
     function addNewIdol() {
@@ -448,19 +527,14 @@
     function saveSettings() {
       appConfig.deviceId = document.getElementById('settingDeviceId').value || "DEV-01";
       appConfig.groupName = document.getElementById('settingGroupName').value || "";
-      appConfig.selectedIndex = parseInt(document.getElementById('settingSelectIdol').value) || 0;
 
       localStorage.setItem('cheki_app_config', JSON.stringify(appConfig));
       closeModal('modal-settings');
+      generateSerialId();
       updateSettingsUI();
     }
 
     loadSettings();
-    document.getElementById('settingSelectIdol').addEventListener('change', (e) => {
-      appConfig.selectedIndex = parseInt(e.target.value);
-      localStorage.setItem('cheki_app_config', JSON.stringify(appConfig));
-      updateSettingsUI();
-    });
 
 
     // --- カメラ・プレビュー・描画制御 ---
@@ -484,6 +558,8 @@
 
     async function startCamera() {
       switchScreen('screen-capture');
+      generateSerialId();
+      updateLiveFrameStyle();
       try {
         if (mediaStream) {
           mediaStream.getTracks().forEach(track => track.stop());
@@ -520,7 +596,7 @@
       const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
       let randStr = '';
       for(let i=0; i<4; i++) randStr += chars.charAt(Math.floor(Math.random() * chars.length));
-      return `${appConfig.deviceId}-${dateStr}-${randStr}`;
+      cachedSerialId = `${appConfig.deviceId}-${dateStr}-${randStr}`;
     }
 
     function takeSnapshot() {
@@ -532,11 +608,12 @@
       hiddenCanvas.width = targetW;
       hiddenCanvas.height = targetH;
 
+      // 画面上のライブフレームと同じデザイン・配色でキャンバスに描画
       let currentIdol = appConfig.idols[appConfig.selectedIndex] || { color: '#ffffff' };
       hCtx.fillStyle = currentIdol.color;
       hCtx.fillRect(0, 0, targetW, targetH);
 
-      const pX = 30, pY = 30, pW = 540, pH = 670;
+      const pX = 30, pY = 20, pW = 540, pH = 690;
       const vW = video.videoWidth, vH = video.videoHeight;
       const vAspect = vW / vH, targetAspect = pW / pH;
 
@@ -551,15 +628,15 @@
 
       const now = new Date();
       const dateText = `${now.getFullYear()}.${now.getMonth()+1}.${now.getDate()}`;
-      const serialText = generateSerialId();
 
-      hCtx.fillStyle = '#333333';
+      const textColor = getContrastTextColor(currentIdol.color);
+      hCtx.fillStyle = textColor;
       hCtx.font = 'bold 16px sans-serif';
       hCtx.textAlign = 'left';
       hCtx.fillText(dateText, 35, 765);
       hCtx.textAlign = 'right';
       hCtx.font = '14px monospace';
-      hCtx.fillText(serialText, 565, 765);
+      hCtx.fillText(cachedSerialId, 565, 765);
 
       hiddenCanvas.toBlob(function(blob) {
         if(rawSnapshotBlobUrl) URL.revokeObjectURL(rawSnapshotBlobUrl);
