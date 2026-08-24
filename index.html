@@ -73,16 +73,24 @@
       font-weight: bold;
     }
 
+    /* 描画画面レイアウト（全画面化・上部寄せ調整） */
+    #screen-draw {
+      justify-content: flex-start;
+      padding-top: 50px;
+    }
+
     #chekiCanvas {
-      width: 90vw;
-      max-width: 380px;
+      width: auto;
+      height: auto;
+      max-width: 96vw;
+      max-height: calc(100vh - 60px);
       aspect-ratio: 3 / 4;
-      border-radius: 4px;
+      border-radius: 6px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.8);
       background: white;
       object-fit: contain;
       touch-action: none;
-      margin-top: 50px;
+      margin: 0 auto;
     }
 
     button { font-size: 14px; cursor: pointer; border: none; border-radius: 20px; font-weight: bold; }
@@ -765,11 +773,10 @@
       hCtx.textAlign = 'left';
       hCtx.fillText(dateText, 35, 762);
 
-      // シリアル番号描画（画面上には綺麗な認識番号がそのまま大きく表示される）
+      // シリアル番号描画
       hCtx.font = 'bold 20px monospace';
       const serialMetrics = hCtx.measureText(cachedSerialId);
       const textPaddingX = 10;
-      const textPaddingY = 6;
       const bgBoxWidth = serialMetrics.width + (textPaddingX * 2);
       const bgBoxHeight = 28;
       const bgBoxX = 565 - bgBoxWidth;
@@ -799,7 +806,6 @@
       if (rawSnapshotBlobUrl) {
         const autoLink = document.createElement('a');
         autoLink.href = rawSnapshotBlobUrl;
-        // ★ここで自動的に「_raw」を裏で付与して保存します
         autoLink.download = `${currentMetadata.group}_${currentMetadata.idol}_raw_${cachedSerialId}.jpg`;
         document.body.appendChild(autoLink);
         autoLink.click();
@@ -917,7 +923,6 @@
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        // ★ここで自動的に「_deco」を裏で付与して保存します
         link.download = `${currentMetadata.group}_${currentMetadata.idol}_deco_${cachedSerialId}.jpg`;
         document.body.appendChild(link);
         link.click();
