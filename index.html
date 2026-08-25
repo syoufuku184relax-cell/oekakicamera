@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>特典会チェキアプリ（ファイル名自動振り分け版）</title>
+  <title>特典会チェキアプリ (オフライン完全対応)</title>
   <style>
-    /* 画面のスクロールや引っ張り更新を完全に防止 */
     html, body {
       width: 100%; height: 100%;
       margin: 0; padding: 0;
@@ -38,7 +37,6 @@
       align-items: center;
     }
     
-    /* ライブ合成用のチェキ風コンテナ */
     #liveChekiFrame {
       width: 88vw;
       max-width: 400px;
@@ -57,9 +55,9 @@
     
     video, .preview-image {
       width: 100%;
-      aspect-ratio: 540 / 670; /* 内部のカメラ映像比率 */
+      aspect-ratio: 540 / 670;
       object-fit: cover;
-      background: #000;
+      background: #222;
       border-radius: 4px;
     }
 
@@ -73,7 +71,6 @@
       font-weight: bold;
     }
 
-    /* 描画画面レイアウト（全画面化・上部寄せ調整） */
     #screen-draw {
       justify-content: flex-start;
       padding-top: 50px;
@@ -180,13 +177,18 @@
     .palette-btn {
       padding: 10px 4px;
       border-radius: 8px;
-      border: 2px solid rgba(255,255,255,0.6);
+      border: 2px solid rgba(255,255,255,0.4);
       font-weight: bold;
-      font-size: 12px;
+      font-size: 11px;
       cursor: pointer;
       text-align: center;
       box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-      transition: transform 0.1s;
+      transition: transform 0.1s, border-color 0.1s;
+    }
+    .palette-btn.selected {
+      border: 3px solid #ff4081 !important;
+      transform: scale(1.05);
+      box-shadow: 0 0 8px rgba(255, 64, 129, 0.8);
     }
     .palette-btn:active { transform: scale(0.95); }
 
@@ -238,14 +240,15 @@
       <div id="liveChekiFrame">
         <video id="cameraStream" autoplay playsinline muted></video>
         <div class="live-footer">
-          <span id="liveDateText" style="font-size: 13px;">2026.6.6</span>
+          <span id="liveDateText" style="font-size: 13px;">2026.8.25</span>
           <span id="liveSerialText" style="font-size: 12px; font-family: monospace; background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 4px;">DEV-01-XXXX</span>
         </div>
       </div>
 
       <div class="camera-controls">
         <button id="torchBtn" class="tool-icon-btn" style="width:34px; height:34px; font-size:14px;" onclick="toggleTorch()" title="フラッシュライト">⚡</button>
-        <span style="font-size:11px;">🔍 ズーム</span>
+        <button id="switchCameraBtn" class="tool-icon-btn" style="width:34px; height:34px; font-size:14px; margin-left:4px;" onclick="switchCamera()" title="カメラ切替">🔄</button>
+        <span style="font-size:11px; margin-left:6px;">🔍 ズーム</span>
         <input type="range" id="zoomSlider" class="zoom-slider" min="1" max="5" step="0.1" value="1" oninput="changeZoom(this.value)">
         <span id="zoomValueText" style="font-size:11px; width:28px; text-align:right;">1.0x</span>
       </div>
@@ -280,23 +283,20 @@
       <button class="tool-icon-btn" onclick="openModal('modal-stamp')" title="スタンプ">⭐</button>
       <button class="tool-icon-btn" onclick="undoCanvas()" title="戻す">↩️</button>
       <button class="tool-icon-btn" onclick="clearCanvas()" title="クリア" style="background:#b52b27;">🗑️</button>
-      <button class="tool-icon-btn" onclick="saveCheki()" title="保存・プリント準備" style="background:#28a745;">💾</button>
+      <button class="tool-icon-btn" onclick="saveCheki()" title="保存完了" style="background:#28a745;">💾</button>
     </div>
     <canvas id="chekiCanvas"></canvas>
   </div>
 
-  <!-- ================= 各種ポップアップモーダル ================= -->
+  <!-- ================= モーダル群 ================= -->
 
   <div id="modal-select-target" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-select-target')">
     <div class="modal-content">
       <div class="modal-title">グループ & メンバー選択</div>
-      
       <div style="font-size: 12px; color: #aaa; text-align: left; margin-bottom: 4px;">📂 グループを選択</div>
       <div id="modalGroupSelectList" style="max-height: 120px; overflow-y: auto; margin-bottom: 12px;"></div>
-
       <div style="font-size: 12px; color: #aaa; text-align: left; margin-bottom: 4px;">👤 メンバーを選択</div>
       <div id="modalIdolSelectList" style="max-height: 150px; overflow-y: auto; margin-bottom: 10px;"></div>
-
       <button class="pop-btn" style="background:#444;" onclick="closeModal('modal-select-target')">閉じる</button>
     </div>
   </div>
@@ -335,16 +335,17 @@
 
   <div id="modal-saved" class="modal-overlay">
     <div class="modal-content" style="text-align:center;">
-      <div class="modal-title" style="color:#28a745;">💾 保存・プリント準備完了！</div>
-      <img id="savedResultImage" style="width: 100%; border-radius: 6px; margin: 10px 0; aspect-ratio:3/4; object-fit:contain; background:#000;" alt="保存画像">
-      <div id="metaInfoBox" style="font-size:12px; color:#fff; background:#181818; padding:8px; border-radius:4px; margin-bottom:10px; text-align:left; border: 1px solid #444;"></div>
-      <button class="btn-main" style="width:100%; padding:10px; margin-top:5px;" onclick="finishAndResetCamera()">次の撮影へ 📸</button>
+      <div class="modal-title" style="color:#28a745;">💾 ローカル保存完了</div>
+      <p style="font-size:12px; color:#ccc; margin-bottom:12px;">画像は端末に保存され、内部データベースにも記録されました。</p>
+      
+      <div id="metaInfoBox" style="font-size:11px; color:#fff; background:#181818; padding:10px; border-radius:6px; margin-bottom:12px; text-align:left; border: 1px solid #444;"></div>
+      <button class="btn-main" style="width:100%; padding:12px;" onclick="finishAndResetCamera()">次の撮影へ 📸</button>
     </div>
   </div>
 
   <div id="modal-settings" class="modal-overlay" onclick="closeModalOnBg(event, 'modal-settings')">
     <div class="modal-content">
-      <div class="modal-title">アプリ設定 ＆ グループ管理</div>
+      <div class="modal-title">アプリ設定 ＆ ローカル管理</div>
       
       <div class="setting-group">
         <label>端末ID</label>
@@ -356,18 +357,24 @@
         <div id="groupListContainer" style="max-height: 80px; overflow-y: auto; border: 1px solid #444; border-radius: 6px; padding: 4px; background:#181818; margin-bottom:4px;"></div>
         <div style="display:flex; gap:4px;">
           <input type="text" id="newGroupNameInput" placeholder="新しいグループ名" style="font-size:12px; padding:6px;">
-          <button class="pop-btn" style="width:90px; background:#449d44; padding:6px; font-size:11px;" onclick="addGroup()">追加</button>
+          <button class="pop-btn" style="width:90px; background:#28a745; padding:6px; font-size:11px;" onclick="addGroup()">追加</button>
         </div>
       </div>
 
       <div class="setting-group">
-        <label>登録メンバー一覧</label>
-        <div id="idolListContainer" style="max-height: 90px; overflow-y: auto; border: 1px solid #444; border-radius: 6px; padding: 4px; background:#181818; margin-bottom:4px;"></div>
-        <input type="text" id="newIdolName" placeholder="メンバー名" style="font-size:12px; padding:6px; margin-bottom:4px;">
-        <label style="font-size: 11px; color: #aaa; margin-bottom: 2px; display:block;">メンカラ選択:</label>
+        <label style="font-weight:bold; color:#ff4081;">登録済みメンバー一覧</label>
+        <div id="idolListContainer" style="max-height: 90px; overflow-y: auto; border: 1px solid #444; border-radius: 6px; padding: 4px; background:#181818; margin-bottom: 8px;"></div>
+
+        <label style="font-weight:bold; color:#fff;">新規メンバー追加 ＆ カラー選択</label>
+        <input type="text" id="newIdolName" placeholder="メンバー名を入力" style="font-size:12px; padding:6px; margin-bottom:6px;">
         <div id="settingColorPaletteContainer" class="color-palette-grid" style="margin-bottom:6px;"></div>
-        <div id="selectedColorPreview" style="font-size: 11px; margin-bottom: 6px; color: #ffcc00;">選択中カラー: 赤</div>
-        <button class="pop-btn" style="width: 100%; background: #449d44; padding: 6px; font-size: 12px;" onclick="addNewIdol()">メンバーを追加する</button>
+        <div id="selectedColorPreview" style="font-size: 11px; margin-bottom: 6px; color: #ffcc00; font-weight: bold;">選択中カラー: 緑 (#28A745)</div>
+        <button class="pop-btn" style="width: 100%; background: #28a745; padding: 8px; font-size: 13px;" onclick="addNewIdol()">メンバーを追加する</button>
+      </div>
+
+      <div class="setting-group" style="margin-top:15px; border-top:1px solid #444; padding-top:10px;">
+        <label style="font-weight:bold; color:#00bfff;">📊 ローカル保存件数確認</label>
+        <div id="localDbStats" style="font-size:12px; color:#ccc; margin-top:4px;">保存済み写真: 読み込み中...</div>
       </div>
 
       <button class="btn-main" style="width:100%; margin-top:5px; padding:10px;" onclick="saveSettings()">設定を保存して閉じる</button>
@@ -379,12 +386,12 @@
       { name: "赤", code: "#FF0000" },
       { name: "青", code: "#0000FF" },
       { name: "黄", code: "#FFFF00" },
-      { name: "紫", code: "#ff00ff" },
+      { name: "紫", code: "#FF00FF" },
       { name: "ピンク", code: "#FF69B4" },
-      { name: "緑", code: "#008000" },
-      { name: "パステルブルー", code: "#ADD8E6" },
-      { name: "オレンジ", code: "#FFA500" },
+      { name: "緑", code: "#28A745" },
       { name: "エメラルド", code: "#50C878" },
+      { name: "水色", code: "#00BFFF" },
+      { name: "オレンジ", code: "#FFA500" },
       { name: "白", code: "#FFFFFF" },
       { name: "黒", code: "#000000" }
     ];
@@ -392,39 +399,89 @@
     function getContrastTextColor(hexColor) {
       let c = hexColor.replace('#', '');
       if (c.length === 3) c = c.split('').map(x => x + x).join('');
-      const r = parseInt(c.substr(0, 2), 16);
-      const g = parseInt(c.substr(2, 2), 16);
-      const b = parseInt(c.substr(4, 2), 16);
+      const r = parseInt(c.substr(0, 2), 16) || 0;
+      const g = parseInt(c.substr(2, 2), 16) || 0;
+      const b = parseInt(c.substr(4, 2), 16) || 0;
       const yiq = (r * 299 + g * 587 + b * 114) / 1000;
       return yiq >= 128 ? '#000000' : '#FFFFFF';
     }
 
     let appConfig = {
       deviceId: "DEV-01",
-      groups: ["グループA", "グループB"],
+      groups: ["グループA"],
       selectedGroupIndex: 0,
       idols: [
-        { name: "メンバーA", color: "#FF69B4" },
-        { name: "メンバーB", color: "#0000FF" }
+        { name: "メンバーA", color: "#FF69B4" }
       ],
       selectedIndex: 0
     };
 
-    let newIdolSelectedColor = "#FF0000";
+    let newIdolSelectedColor = "#28A745";
     let cachedSerialId = "";
     let currentMetadata = {};
 
     let mediaStream = null;
     let videoTrack = null;
     let isTorchOn = false;
+    let facingMode = "environment";
+
+    // ローカルデータベース (IndexedDB)
+    let db = null;
+    function initIndexedDB() {
+      try {
+        const request = indexedDB.open("CheerDreamLocalDB", 1);
+        request.onupgradeneeded = function(e) {
+          let dbRef = e.target.result;
+          if (!dbRef.objectStoreNames.contains("photos")) {
+            dbRef.createObjectStore("photos", { keyPath: "photoId" });
+          }
+        };
+        request.onsuccess = function(e) { 
+          db = e.target.result; 
+          updateDbStats();
+        };
+      } catch (e) {
+        console.warn("IndexedDB Fallback");
+      }
+    }
+    initIndexedDB();
+
+    function saveToIndexedDB(record) {
+      if (!db) return;
+      try {
+        const tx = db.transaction("photos", "readwrite");
+        const store = tx.objectStore("photos");
+        store.put(record);
+        updateDbStats();
+      } catch (e) {
+        console.error("ローカル保存エラー:", e);
+      }
+    }
+
+    function updateDbStats() {
+      if (!db) return;
+      try {
+        const tx = db.transaction("photos", "readonly");
+        const store = tx.objectStore("photos");
+        const countRequest = store.count();
+        countRequest.onsuccess = function() {
+          const statsEl = document.getElementById('localDbStats');
+          if (statsEl) {
+            statsEl.innerText = `端末内保存データ: ${countRequest.result} 件`;
+          }
+        };
+      } catch(e) {}
+    }
 
     function loadSettings() {
       const saved = localStorage.getItem('cheki_app_config_multi');
       if (saved) {
         try {
           appConfig = JSON.parse(saved);
-          if(!appConfig.groups) appConfig.groups = ["グループA"];
+          if(!appConfig.groups || appConfig.groups.length === 0) appConfig.groups = ["グループA"];
+          if(!appConfig.idols || appConfig.idols.length === 0) appConfig.idols = [{ name: "メンバーA", color: "#FF69B4" }];
           if(appConfig.selectedGroupIndex === undefined) appConfig.selectedGroupIndex = 0;
+          if(appConfig.selectedIndex === undefined) appConfig.selectedIndex = 0;
         } catch(e) {}
       }
       generateSerialId();
@@ -434,42 +491,48 @@
 
     function buildColorPalettes() {
       const settingContainer = document.getElementById('settingColorPaletteContainer');
-      settingContainer.innerHTML = '';
-      COLOR_PALETTE.forEach(item => {
-        let btn = document.createElement('button');
-        btn.className = 'palette-btn';
-        btn.style.backgroundColor = item.code;
-        btn.style.color = getContrastTextColor(item.code);
-        btn.innerText = item.name;
-        if(item.code === newIdolSelectedColor) {
-          btn.style.border = '2px solid #ff4081';
-          btn.style.transform = 'scale(1.03)';
-        }
-        btn.onclick = () => {
-          newIdolSelectedColor = item.code;
-          document.getElementById('selectedColorPreview').innerText = `選択中カラー: ${item.name}`;
-          buildColorPalettes();
-        };
-        settingContainer.appendChild(btn);
-      });
+      if (settingContainer) {
+        settingContainer.innerHTML = '';
+        COLOR_PALETTE.forEach(item => {
+          let btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'palette-btn';
+          if (item.code === newIdolSelectedColor) {
+            btn.classList.add('selected');
+          }
+          btn.style.backgroundColor = item.code;
+          btn.style.color = getContrastTextColor(item.code);
+          btn.innerText = item.name;
+          
+          btn.onclick = (e) => {
+            e.preventDefault();
+            newIdolSelectedColor = item.code;
+            document.getElementById('selectedColorPreview').innerText = `選択中カラー: ${item.name} (${item.code})`;
+            buildColorPalettes();
+          };
+          settingContainer.appendChild(btn);
+        });
+      }
 
       const drawingContainer = document.getElementById('drawingColorPaletteContainer');
-      drawingContainer.innerHTML = '';
-      COLOR_PALETTE.forEach(item => {
-        let btn = document.createElement('button');
-        btn.className = 'palette-btn';
-        btn.style.backgroundColor = item.code;
-        btn.style.color = getContrastTextColor(item.code);
-        btn.style.padding = '14px 4px';
-        btn.style.fontSize = '13px';
-        btn.innerText = item.name;
-        btn.onclick = () => {
-          penColor = item.code;
-          selectedStamp = null;
-          closeModal('modal-color');
-        };
-        drawingContainer.appendChild(btn);
-      });
+      if (drawingContainer) {
+        drawingContainer.innerHTML = '';
+        COLOR_PALETTE.forEach(item => {
+          let btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'palette-btn';
+          btn.style.backgroundColor = item.code;
+          btn.style.color = getContrastTextColor(item.code);
+          btn.style.padding = '12px 2px';
+          btn.innerText = item.name;
+          btn.onclick = () => {
+            penColor = item.code;
+            selectedStamp = null;
+            closeModal('modal-color');
+          };
+          drawingContainer.appendChild(btn);
+        });
+      }
     }
 
     function updateSettingsUI() {
@@ -517,7 +580,6 @@
           appConfig.selectedGroupIndex = idx;
           localStorage.setItem('cheki_app_config_multi', JSON.stringify(appConfig));
           updateSettingsUI();
-          updateLiveFrameStyle();
         };
         modalGroupList.appendChild(row);
       });
@@ -540,7 +602,6 @@
           appConfig.selectedIndex = idx;
           localStorage.setItem('cheki_app_config_multi', JSON.stringify(appConfig));
           updateSettingsUI();
-          updateLiveFrameStyle();
         };
         selectModalList.appendChild(row);
       });
@@ -616,10 +677,9 @@
       updateSettingsUI();
     }
 
-    loadSettings();
-
     const video = document.getElementById('cameraStream');
     let rawSnapshotBlobUrl = null;
+    let rawHighQualityBlob = null;
 
     const canvas = document.getElementById('chekiCanvas');
     const ctx = canvas.getContext('2d');
@@ -639,20 +699,35 @@
       switchScreen('screen-capture');
       generateSerialId();
       updateLiveFrameStyle();
-      try {
-        if (mediaStream) {
-          mediaStream.getTracks().forEach(track => track.stop());
-        }
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment', width: { ideal: 1080 }, height: { ideal: 1440 } },
-          audio: false
-        });
-        video.srcObject = mediaStream;
-        videoTrack = mediaStream.getVideoTracks()[0];
+      
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+      }
 
-        const capabilities = videoTrack.getCapabilities();
+      const constraintsOptions = [
+        { video: { facingMode: { exact: facingMode }, width: { ideal: 1080 }, height: { ideal: 1440 } }, audio: false },
+        { video: { facingMode: facingMode }, audio: false },
+        { video: true, audio: false }
+      ];
+
+      let streamObtained = false;
+      for (let constraints of constraintsOptions) {
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+          video.srcObject = mediaStream;
+          videoTrack = mediaStream.getVideoTracks()[0];
+          streamObtained = true;
+          break;
+        } catch (e) {
+          console.warn("Camera constraint retry...", e);
+        }
+      }
+
+      if (streamObtained && videoTrack) {
+        const capabilities = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
         const zoomSlider = document.getElementById('zoomSlider');
         if (capabilities.zoom) {
+          zoomSlider.disabled = false;
           zoomSlider.min = capabilities.zoom.min;
           zoomSlider.max = capabilities.zoom.max;
           zoomSlider.step = capabilities.zoom.step || 0.1;
@@ -661,26 +736,14 @@
         } else {
           zoomSlider.disabled = true;
         }
-
         isTorchOn = false;
         document.getElementById('torchBtn').classList.remove('active-torch');
-
-      } catch (err) {
-        document.body.addEventListener('click', retryCameraOnce, { once: true });
       }
     }
 
-    async function retryCameraOnce() {
-      try {
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment', width: { ideal: 1080 }, height: { ideal: 1440 } },
-          audio: false
-        });
-        video.srcObject = mediaStream;
-        videoTrack = mediaStream.getVideoTracks()[0];
-      } catch (e) {
-        alert('カメラのアクセスを許可してください。');
-      }
+    function switchCamera() {
+      facingMode = (facingMode === "environment") ? "user" : "environment";
+      startCamera();
     }
 
     async function changeZoom(val) {
@@ -696,7 +759,7 @@
 
     async function toggleTorch() {
       if (!videoTrack) return;
-      const capabilities = videoTrack.getCapabilities();
+      const capabilities = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
       if (!capabilities.torch) {
         alert('この端末またはブラウザはフラッシュライトに対応していません。');
         return;
@@ -753,7 +816,7 @@
       hCtx.fillRect(0, 0, targetW, targetH);
 
       const pX = 30, pY = 20, pW = 540, pH = 690;
-      const vW = video.videoWidth, vH = video.videoHeight;
+      const vW = video.videoWidth || 1080, vH = video.videoHeight || 1440;
       const vAspect = vW / vH, targetAspect = pW / pH;
 
       let sx, sy, sW, sH;
@@ -773,7 +836,6 @@
       hCtx.textAlign = 'left';
       hCtx.fillText(dateText, 35, 762);
 
-      // シリアル番号描画
       hCtx.font = 'bold 20px monospace';
       const serialMetrics = hCtx.measureText(cachedSerialId);
       const textPaddingX = 10;
@@ -790,6 +852,7 @@
       hCtx.fillText(cachedSerialId, 565 - textPaddingX, bgBoxY + 20);
 
       hiddenCanvas.toBlob(function(blob) {
+        rawHighQualityBlob = blob;
         if(rawSnapshotBlobUrl) URL.revokeObjectURL(rawSnapshotBlobUrl);
         rawSnapshotBlobUrl = URL.createObjectURL(blob);
         
@@ -799,7 +862,7 @@
           mediaStream.getTracks().forEach(track => track.stop());
         }
         switchScreen('screen-preview');
-      }, 'image/jpeg', 0.9);
+      }, 'image/jpeg', 0.92);
     }
 
     function saveRawAndProceedToDraw() {
@@ -835,7 +898,7 @@
     function closeModalOnBg(e, modalId) { if (e.target.id === modalId) closeModal(modalId); }
 
     function setPenSize(size) { penSize = size; closeModal('modal-size'); }
-    function selectStamp(stampText) { selectedStamp = stampText; closeModal('modal-stamp'); }
+    function selectStamp(stampText) { selectedStamp = stampText; closeModal('modal-size'); closeModal('modal-stamp'); }
     function cancelStamp() { selectedStamp = null; closeModal('modal-stamp'); }
 
     function initDrawingEvents() {
@@ -919,8 +982,14 @@
     }
 
     function saveCheki() {
-      canvas.toBlob(function(blob) {
-        const url = URL.createObjectURL(blob);
+      canvas.toBlob(function(decoBlob) {
+        if (!decoBlob) {
+          alert('画像の保存に失敗しました。');
+          return;
+        }
+
+        // 1. 端末のダウンロードフォルダーに画像出力
+        const url = URL.createObjectURL(decoBlob);
         const link = document.createElement('a');
         link.href = url;
         link.download = `${currentMetadata.group}_${currentMetadata.idol}_deco_${cachedSerialId}.jpg`;
@@ -928,12 +997,21 @@
         link.click();
         document.body.removeChild(link);
 
-        document.getElementById('savedResultImage').src = url;
+        // 2. ローカルDB (IndexedDB) に完全記録
+        const record = {
+          photoId: cachedSerialId,
+          metadata: currentMetadata,
+          rawBlob: rawHighQualityBlob,
+          decoBlob: decoBlob,
+          createdAt: new Date().toISOString()
+        };
+        saveToIndexedDB(record);
+
+        // UI表示の更新
         document.getElementById('metaInfoBox').innerHTML = `
-          <b style="color:#ff4081; font-size:13px;">【スタッフ確認用情報】</b><br>
-          📁 グループ: <b>${currentMetadata.group}</b><br>
-          👤 メンバー: <b style="color:#ffcc00; font-size:14px;">${currentMetadata.idol}</b><br>
-          🔢 シリアルID: <b style="font-family:monospace; font-size:14px; background:#333; padding:2px 4px;">${currentMetadata.serial}</b><br>
+          <b style="color:#ff4081; font-size:12px;">【撮影完了データ】</b><br>
+          📁 グループ: <b>${currentMetadata.group}</b> / 👤 メンバー: <b style="color:#ffcc00;">${currentMetadata.idol}</b><br>
+          🔢 シリアルID: <b style="font-family:monospace;">${currentMetadata.serial}</b><br>
           📅 撮影日付: ${currentMetadata.date}
         `;
 
@@ -943,10 +1021,18 @@
 
     function finishAndResetCamera() {
       closeModal('modal-saved');
+      
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      history = [];
+      baseImage = null;
+
       startCamera();
     }
 
-    window.addEventListener('load', startCamera);
+    window.addEventListener('load', () => {
+      loadSettings();
+      startCamera();
+    });
   </script>
 </body>
 </html>
