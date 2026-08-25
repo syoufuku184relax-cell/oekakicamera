@@ -52,7 +52,7 @@ html, body {
   padding: 20px 20px 10px 20px;
   box-sizing: border-box;
   box-shadow: 0 4px 20px rgba(0,0,0,0.8);
-  cursor: pointer; /* タップ可能を示すカーソル */
+  cursor: pointer;
 }
 video, .preview-image {
   width: 100%;
@@ -159,7 +159,7 @@ button {
   accent-color: #ff4081;
 }
 
-/* フローティングシャッターボタン用CSS */
+/* フローティングシャッターボタン */
 #floatingShutterBtn {
   position: fixed;
   bottom: 25px;
@@ -183,6 +183,29 @@ button {
 #floatingShutterBtn:active {
   cursor: grabbing;
   transform: scale(0.95);
+}
+
+/* カウントダウン表示用オーバーレイ */
+#countdownOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 90px;
+  font-weight: bold;
+  color: #ff4081;
+  text-shadow: 0 4px 20px rgba(0,0,0,0.9);
+  z-index: 40;
+  border-radius: 8px;
+  pointer-events: none;
+}
+#countdownOverlay.active {
+  display: flex;
 }
 
 .modal-overlay {
@@ -270,7 +293,7 @@ button {
   margin-bottom: 3px;
   color: #aaa;
 }
-.setting-group input {
+.setting-group input, .setting-group select {
   width: 100%;
   padding: 8px;
   border-radius: 6px;
@@ -317,9 +340,10 @@ button {
   </div>
 
   <div class="viewfinder-container" style="margin-top: 25px;">
-    <!-- チェキフレーム全体クリック（タップ）で撮影 -->
+    <!-- チェキフレーム全体タップで撮影 -->
     <div id="liveChekiFrame" onclick="handleFrameTap(event)">
       <video id="cameraStream" autoplay playsinline muted></video>
+      <div id="countdownOverlay">3</div>
       <div class="live-footer">
         <span id="liveDateText" style="font-size: 13px;">2026.8.25</span>
         <span id="liveSerialText" style="font-size: 12px; font-family: monospace; background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 4px;">DEV-01-XXXX</span>
@@ -335,7 +359,7 @@ button {
     </div>
   </div>
 
-  <!-- 移動可能（フローティング）シャッターボタン -->
+  <!-- フローティングシャッターボタン -->
   <div id="floatingShutterBtn">📸</div>
 
   <canvas id="hiddenCanvas" style="display:none;"></canvas>
@@ -430,6 +454,14 @@ button {
       <input type="text" id="settingDeviceId" placeholder="例: DEV-01">
     </div>
     <div class="setting-group">
+      <label>インカメラ撮影時タイマー秒数</label>
+      <select id="settingTimerSeconds">
+        <option value="0">タイマーなし (即時撮影)</option>
+        <option value="3">3秒</option>
+        <option value="5">5秒</option>
+      </select>
+    </div>
+    <div class="setting-group">
       <label>登録グループ一覧</label>
       <div id="groupListContainer" style="max-height: 80px; overflow-y: auto; border: 1px solid #444; border-radius: 6px; padding: 4px; background:#181818; margin-bottom:4px;"></div>
       <div style="display:flex; gap:4px;">
@@ -481,6 +513,7 @@ function getContrastTextColor(hexColor) {
 
 let appConfig = {
   deviceId: "DEV-01",
+  timerSeconds: 3, // デフォルト3秒
   groups: ["グループA"],
   selectedGroupIndex: 0,
   idols: [
@@ -496,6 +529,7 @@ let mediaStream = null;
 let videoTrack = null;
 let isTorchOn = false;
 let facingMode = "environment";
+let isCountingDown = false; // タイマー実行中フラグ
 
 // ローカルデータベース (IndexedDB)
 let db = null;
@@ -554,6 +588,7 @@ function loadSettings() {
       if(!appConfig.idols || appConfig.idols.length === 0) appConfig.idols = [{ name: "メンバーA", color: "#FF69B4" }];
       if(appConfig.selectedGroupIndex === undefined) appConfig.selectedGroupIndex = 0;
       if(appConfig.selectedIndex === undefined) appConfig.selectedIndex = 0;
+      if(appConfig.timerSeconds === undefined) appConfig.timerSeconds = 3;
     } catch(e) {}
   }
   generateSerialId();
@@ -608,6 +643,7 @@ function buildColorPalettes() {
 
 function updateSettingsUI() {
   document.getElementById('settingDeviceId').value = appConfig.deviceId || "DEV-01";
+  document.getElementById('settingTimerSeconds').value = appConfig.timerSeconds;
 
   const groupContainer = document.getElementById('groupListContainer');
   groupContainer.innerHTML = '';
@@ -741,6 +777,7 @@ function removeIdol(idx) {
 
 function saveSettings() {
   appConfig.deviceId = document.getElementById('settingDeviceId').value || "DEV-01";
+  appConfig.timerSeconds = parseInt(document.getElementById('settingTimerSeconds').value, 10) || 0;
   localStorage.setItem('cheki_app_config_multi', JSON.stringify(appConfig));
   closeModal('modal-settings');
   generateSerialId();
@@ -860,10 +897,45 @@ function generateSerialId() {
   cachedSerialId = `${appConfig.deviceId}-${dateStr}-${randStr}`;
 }
 
-// フレームタップ処理（画面のどこでもタップ撮影）
+// 撮影トリガー（フレームタップ）
 function handleFrameTap(e) {
-  // 日付・シリアル表記など特定のクリック不可エレメント以外のタップで撮影を実行
-  takeSnapshot();
+  triggerCapture();
+}
+
+// インカメラ時のみタイマーを考慮する撮影制御
+function triggerCapture() {
+  if (isCountingDown) return; // 連続押し防止
+
+  // インカメラ（user）かつタイマー秒数が設定されている場合
+  const isFrontCamera = (facingMode === "user");
+  const timerSec = appConfig.timerSeconds || 0;
+
+  if (isFrontCamera && timerSec > 0) {
+    startCountdownAndTakeSnapshot(timerSec);
+  } else {
+    takeSnapshot();
+  }
+}
+
+// カウントダウン処理
+function startCountdownAndTakeSnapshot(seconds) {
+  isCountingDown = true;
+  const overlay = document.getElementById('countdownOverlay');
+  let remaining = seconds;
+  overlay.innerText = remaining;
+  overlay.classList.add('active');
+
+  const timerInterval = setInterval(() => {
+    remaining--;
+    if (remaining > 0) {
+      overlay.innerText = remaining;
+    } else {
+      clearInterval(timerInterval);
+      overlay.classList.remove('active');
+      isCountingDown = false;
+      takeSnapshot();
+    }
+  }, 1000);
 }
 
 function takeSnapshot() {
@@ -907,7 +979,17 @@ function takeSnapshot() {
     sy = (vH - sH) / 2;
   }
 
-  hCtx.drawImage(video, sx, sy, sW, sH, pX, pY, pW, pH);
+  // インカメラの場合は鏡像反転してキャプチャする
+  hCtx.save();
+  if (facingMode === "user") {
+    hCtx.translate(targetW, 0);
+    hCtx.scale(-1, 1);
+    // 反転時は座標系が左右逆になるため描画位置を調整
+    hCtx.drawImage(video, sx, sy, sW, sH, targetW - pX - pW, pY, pW, pH);
+  } else {
+    hCtx.drawImage(video, sx, sy, sW, sH, pX, pY, pW, pH);
+  }
+  hCtx.restore();
 
   const dateText = `${now.getFullYear()}.${now.getMonth()+1}.${now.getDate()}`;
   const textColor = getContrastTextColor(currentIdol.color);
@@ -1127,9 +1209,7 @@ function finishAndResetCamera() {
   startCamera();
 }
 
-/* -------------------------------------------------------------
- * フローティングシャッターボタンのドラッグ＆タップイベント処理
- * ------------------------------------------------------------- */
+// フローティングシャッターボタンのドラッグ＆タップイベント処理
 function initFloatingButton() {
   const btn = document.getElementById('floatingShutterBtn');
   let isDragging = false;
@@ -1163,7 +1243,6 @@ function initFloatingButton() {
     let newLeft = initialLeft + dx;
     let newTop = initialTop + dy;
 
-    // 画面外へのはみ出しを制御
     const maxLeft = window.innerWidth - rectWidth(btn);
     const maxTop = window.innerHeight - rectHeight(btn);
 
@@ -1181,9 +1260,8 @@ function initFloatingButton() {
     isDragging = false;
     btn.releasePointerCapture(e.pointerId);
 
-    // ドラッグ移動していない（タップのみ）場合はシャッターを切る
     if (!hasMoved) {
-      takeSnapshot();
+      triggerCapture();
     }
   });
 
